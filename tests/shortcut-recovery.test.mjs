@@ -8,6 +8,10 @@ import vm from "node:vm";
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const backgroundSource = readFileSync(resolve(root, "background.js"), "utf8");
 
+function plain(value) {
+  return JSON.parse(JSON.stringify(value));
+}
+
 function createHarness({ commands = [] } = {}) {
   let connectListener;
   let commandListener;
@@ -23,7 +27,7 @@ function createHarness({ commands = [] } = {}) {
     commands: {
       onCommand: { addListener(fn) { commandListener = fn; } },
       async getAll() { return commands; },
-      async update(value) { calls.updates.push({ ...value }); }
+      async update(value) { calls.updates.push(plain(value)); }
     },
     runtime: {
       onConnect: { addListener(fn) { connectListener = fn; } },
@@ -42,8 +46,8 @@ function createHarness({ commands = [] } = {}) {
     },
     tabs: {
       async query() { return [{ id: 7, pinned: false }]; },
-      async update(...args) { calls.tabUpdates.push(args); },
-      async create(options) { calls.tabCreates.push(options); }
+      async update(...args) { calls.tabUpdates.push(plain(args)); },
+      async create(options) { calls.tabCreates.push(plain(options)); }
     },
     action: {
       async setBadgeText() {},
@@ -63,8 +67,7 @@ function createHarness({ commands = [] } = {}) {
   return {
     calls,
     async settle() {
-      await Promise.resolve();
-      await Promise.resolve();
+      await new Promise((resolve) => setTimeout(resolve, 0));
     },
     connectShortcutProxy() {
       let messageListener;
