@@ -1,5 +1,7 @@
 # Bookmark Shortcuts Minimal
 
+[![Test](https://github.com/miso-develop/bookmark-shortcuts-extention/actions/workflows/test.yml/badge.svg)](https://github.com/miso-develop/bookmark-shortcuts-extention/actions/workflows/test.yml)
+
 Firefox のブックマークツールバーをキーボードから直接開くための、最小構成の WebExtension です。
 
 ## ショートカット
@@ -50,6 +52,43 @@ Bookmarks API でブックマークツールバーの内容を読み取るため
 
 インストール対象の実行コードは `background.js` だけなので、コード全体を容易に監査できます。
 
+## テスト
+
+Node.js 22 以上で、外部パッケージなしの `node:test` を使用します。
+
+```bash
+npm test
+```
+
+主な検証対象:
+
+- `Alt+1` ～ `Alt+0` 相当のコマンドで正しいツールバー位置を開く
+- 新規タブ用コマンド
+- ピン留めタブを上書きしないこと
+- フォルダー等もツールバー上の位置として数えること
+- 不正なコマンドを無視すること
+- Browser API エラーをコマンドリスナー外へ漏らさないこと
+- Manifest V3 であること
+- 要求権限が `bookmarks` のみに限定されていること
+- `<all_urls>` / `tabs` / `storage` / `activeTab` を要求しないこと
+- 20 個のショートカット定義が期待通りであること
+- データ収集なしの宣言が維持されていること
+
+`tests/background.test.mjs` は Node.js の `vm` 上に Firefox の `browser` API モックを置き、配布対象の `background.js` 自体を読み込んでテストします。本番コードへテスト専用 export は追加していません。
+
+## GitHub Actions
+
+`.github/workflows/test.yml` で `main` への push と Pull Request ごとに `npm test` を実行します。
+
+CI の GitHub Actions 権限は以下に限定しています。
+
+```yaml
+permissions:
+  contents: read
+```
+
+`actions/checkout` と `actions/setup-node` は可変タグではなくコミット SHA に固定しています。
+
 ## 一時インストールして試す
 
 1. このリポジトリを clone または ZIP で取得します。
@@ -75,14 +114,21 @@ Firefox の以下から変更できます。
 
 通常版 Firefox へ永続インストールするには Mozilla の署名が必要です。
 
-この拡張は Manifest V3 の Add-on ID と、2025 年以降の AMO 申請で必要なデータ収集宣言を `manifest.json` に含めています。公開せずに利用する場合は AMO の **Unlisted** 配布として署名済み XPI を取得できます。
+この拡張は Manifest V3 の Add-on ID と、AMO 申請用のデータ収集宣言を `manifest.json` に含めています。公開せずに利用する場合は AMO の **Unlisted** 配布として署名済み XPI を取得できます。
 
 ## ファイル構成
 
 ```text
 .
+├── .github/
+│   └── workflows/
+│       └── test.yml
+├── tests/
+│   ├── background.test.mjs
+│   └── manifest.test.mjs
 ├── manifest.json
 ├── background.js
+├── package.json
 ├── README.md
 └── LICENSE
 ```
