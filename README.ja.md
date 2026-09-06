@@ -1,6 +1,6 @@
-[English](README.md) | **日本語**
-
 # Bookmark Shortcuts Minimal
+
+[English](README.md) | **日本語**
 
 Firefox のブックマークツールバーをキーボードから直接操作する、最小権限の WebExtension です。
 
