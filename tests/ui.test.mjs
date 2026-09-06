@@ -23,6 +23,12 @@ test("uses one explicit selection style instead of a stale focus-visible highlig
   assert.equal(folderJs.includes('document.addEventListener("focusin"'), true);
 });
 
+test("restores focus to the child folder item after navigating back", () => {
+  assert.equal(folderJs.includes("const childFolderId = history.pop()"), true);
+  assert.equal(folderJs.includes("focusFolderId: childFolderId"), true);
+  assert.equal(folderJs.includes("findFolderSelectionIndex(selectableItems, focusFolderId)"), true);
+});
+
 test("defines a full-page layout for folder views opened in a tab", () => {
   assert.equal(folderCss.includes("body.full-page"), true);
   assert.equal(folderCss.includes(".full-page main"), true);

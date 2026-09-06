@@ -57,9 +57,17 @@ export function pageSelectionIndex(currentIndex, itemCount, pageSize, direction)
   return Math.min(itemCount - 1, Math.max(0, currentIndex + direction * step));
 }
 
+export function findFolderSelectionIndex(items, folderId) {
+  if (!folderId) {
+    return -1;
+  }
+
+  return items.findIndex((item) => item?.dataset?.folderId === folderId);
+}
+
 export function getKeyboardAction(
   key,
-  { ctrlKey = false, altKey = false } = {}
+  { ctrlKey = false, altKey = false, shiftKey = false } = {}
 ) {
   if (altKey && (key === "Tab" || key === "Enter")) {
     return "open-full-page";
@@ -71,9 +79,13 @@ export function getKeyboardAction(
     case "ArrowUp":
       return "previous";
     case "PageDown":
-      return "page-next";
+      return shiftKey ? "half-page-next" : "page-next";
     case "PageUp":
-      return "page-previous";
+      return shiftKey ? "half-page-previous" : "page-previous";
+    case "Home":
+      return "first";
+    case "End":
+      return "last";
     case "Enter":
       return ctrlKey ? "activate-new-tab" : "activate";
     case "ArrowLeft":
@@ -187,7 +199,7 @@ async function initializeFolderView() {
     return Math.max(1, Math.floor(viewportHeight / itemHeight));
   }
 
-  function refreshSelectableItems() {
+  function refreshSelectableItems({ focusFolderId = null } = {}) {
     selectableItems = Array.from(itemsContainer.querySelectorAll(".item:not(:disabled)"));
 
     selectableItems.forEach((item, index) => {
@@ -199,11 +211,13 @@ async function initializeFolderView() {
       });
     });
 
-    if (selectableItems.length > 0) {
-      setSelectedIndex(0);
-    } else {
+    if (selectableItems.length === 0) {
       clearSelection();
+      return;
     }
+
+    const restoredIndex = findFolderSelectionIndex(selectableItems, focusFolderId);
+    setSelectedIndex(restoredIndex >= 0 ? restoredIndex : 0);
   }
 
   function alwaysOpenInNewTab() {
@@ -231,7 +245,10 @@ async function initializeFolderView() {
     }
   }
 
-  async function render(folderId, { pushHistory = true, resetHistory = false } = {}) {
+  async function render(
+    folderId,
+    { pushHistory = true, resetHistory = false, focusFolderId = null } = {}
+  ) {
     if (!folderId) {
       return;
     }
@@ -248,7 +265,7 @@ async function initializeFolderView() {
 
       currentFolderId = folder.id;
       title.textContent = folder.title || "(無題のフォルダ)";
-      subtitle.textContent = `${items.length} 件 · ↑↓/PgUp/PgDnで選択 · Enterで開く`;
+      subtitle.textContent = `${items.length} 件 · ↑↓/PgUp/PgDn/Home/Endで選択 · Enterで開く`;
       message.hidden = true;
       itemsContainer.hidden = false;
       itemsContainer.replaceChildren();
@@ -275,7 +292,7 @@ async function initializeFolderView() {
           itemsContainer.append(button);
         }
 
-        refreshSelectableItems();
+        refreshSelectableItems({ focusFolderId });
       }
 
       popupPort?.postMessage({
@@ -299,8 +316,11 @@ async function initializeFolderView() {
       return false;
     }
 
-    history.pop();
-    await render(history.at(-1), { pushHistory: false });
+    const childFolderId = history.pop();
+    await render(history.at(-1), {
+      pushHistory: false,
+      focusFolderId: childFolderId
+    });
     return true;
   }
 
@@ -328,7 +348,8 @@ async function initializeFolderView() {
   document.addEventListener("keydown", async (event) => {
     const action = getKeyboardAction(event.key, {
       ctrlKey: event.ctrlKey,
-      altKey: event.altKey
+      altKey: event.altKey,
+      shiftKey: event.shiftKey
     });
     if (!action) {
       return;
@@ -347,12 +368,28 @@ async function initializeFolderView() {
       return;
     }
 
-    if (action === "page-next" || action === "page-previous") {
+    if (
+      action === "page-next" ||
+      action === "page-previous" ||
+      action === "half-page-next" ||
+      action === "half-page-previous"
+    ) {
       event.preventDefault();
-      const direction = action === "page-next" ? 1 : -1;
+      const direction = action.endsWith("next") ? 1 : -1;
+      const pageSize = getPageSize();
+      const step = action.startsWith("half-page")
+        ? Math.max(1, Math.ceil(pageSize / 2))
+        : pageSize;
       setSelectedIndex(
-        pageSelectionIndex(selectedIndex, selectableItems.length, getPageSize(), direction)
+        pageSelectionIndex(selectedIndex, selectableItems.length, step, direction)
       );
+      return;
+    }
+
+    if (action === "first" || action === "last") {
+      event.preventDefault();
+      const targetIndex = action === "first" ? 0 : selectableItems.length - 1;
+      setSelectedIndex(targetIndex);
       return;
     }
 
