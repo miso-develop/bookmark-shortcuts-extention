@@ -57,15 +57,6 @@ export function findFolderSelectionIndex(items, folderId) {
   return items.findIndex((item) => item?.dataset?.folderId === folderId);
 }
 
-export function findLastBookmarkSelectionIndex(items) {
-  for (let index = items.length - 1; index >= 0; index -= 1) {
-    if (items[index]?.dataset?.itemType === "bookmark") {
-      return index;
-    }
-  }
-  return -1;
-}
-
 export function getKeyboardAction(
   key,
   { ctrlKey = false, altKey = false, shiftKey = false } = {}
@@ -90,7 +81,7 @@ export function getKeyboardAction(
     case "Home":
       return "first";
     case "End":
-      return "last-bookmark";
+      return "last";
     case "Enter":
       return ctrlKey ? "activate-new-tab" : "activate";
     case "Backspace":
@@ -431,16 +422,8 @@ async function initializeFolderView() {
       return;
     }
 
-    if (action === "first") {
-      setSelectedIndex(0);
-      return;
-    }
-
-    if (action === "last-bookmark") {
-      const lastBookmarkIndex = findLastBookmarkSelectionIndex(selectableItems);
-      if (lastBookmarkIndex >= 0) {
-        setSelectedIndex(lastBookmarkIndex);
-      }
+    if (action === "first" || action === "last") {
+      setSelectedIndex(action === "first" ? 0 : selectableItems.length - 1);
       return;
     }
 
