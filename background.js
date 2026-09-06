@@ -7,18 +7,34 @@ const FEEDBACK_DURATION_MS = 900;
 let feedbackGeneration = 0;
 let folderPopupPort = null;
 let folderPopupId = null;
+let folderPopupRootId = null;
 
 browser.runtime.onConnect.addListener((port) => {
-  if (port.name !== "folder-popup") {
-    return;
-  }
+  if (port.name !== "folder-popup") return;
 
   folderPopupPort = port;
   folderPopupId = null;
+  folderPopupRootId = null;
 
-  port.onMessage.addListener((message) => {
+  port.onMessage.addListener(async (message) => {
     if (message?.type === "folder-state" && typeof message.folderId === "string") {
       folderPopupId = message.folderId;
+      folderPopupRootId =
+        typeof message.rootFolderId === "string"
+          ? message.rootFolderId
+          : folderPopupRootId || message.folderId;
+      return;
+    }
+
+    if (
+      message?.type === "navigate-adjacent-root-folder" &&
+      (message.direction === -1 || message.direction === 1)
+    ) {
+      try {
+        await switchAdjacentToolbarFolder(message.direction);
+      } catch (error) {
+        console.error("Adjacent folder navigation failed:", error);
+      }
     }
   });
 
@@ -26,6 +42,7 @@ browser.runtime.onConnect.addListener((port) => {
     if (folderPopupPort === port) {
       folderPopupPort = null;
       folderPopupId = null;
+      folderPopupRootId = null;
     }
   });
 });
@@ -33,19 +50,13 @@ browser.runtime.onConnect.addListener((port) => {
 browser.commands.onCommand.addListener(async (command) => {
   try {
     const match = COMMAND_PATTERN.exec(command);
-    if (!match) {
-      return;
-    }
+    if (!match) return;
 
     const openInNewTab = Boolean(match[1]);
     const position = Number(match[2]);
-    const index = position - 1;
     const items = await browser.bookmarks.getChildren(BOOKMARKS_TOOLBAR_ID);
-    const item = items[index];
-
-    if (!item) {
-      return;
-    }
+    const item = items[position - 1];
+    if (!item) return;
 
     if (item.type === "folder") {
       await showFeedback(position, item, true);
@@ -53,43 +64,75 @@ browser.commands.onCommand.addListener(async (command) => {
       return;
     }
 
-    if (typeof item.url !== "string") {
-      return;
-    }
+    if (typeof item.url !== "string") return;
 
     await showFeedback(position, item, false);
-
     if (openInNewTab) {
       await browser.tabs.create({ url: item.url });
       return;
     }
-
     await openUrlInCurrentTab(item.url);
   } catch (error) {
     console.error("Bookmark shortcut failed:", error);
   }
 });
 
-async function openFolder(folderId) {
+async function switchOpenPopupRootFolder(folderId, position = null, item = null) {
+  if (!folderPopupPort) return false;
+  if (folderPopupRootId === folderId) return true;
+
   const popupPath = `folder.html?id=${encodeURIComponent(folderId)}`;
   await browser.action.setPopup({ popup: popupPath });
 
-  if (folderPopupPort) {
-    if (folderPopupId === folderId) {
-      return;
-    }
-
-    try {
-      folderPopupPort.postMessage({
-        type: "switch-folder",
-        folderId
-      });
-      return;
-    } catch (error) {
-      folderPopupPort = null;
-      folderPopupId = null;
-    }
+  if (position !== null && item) {
+    await showFeedback(position, item, true);
   }
+
+  try {
+    folderPopupPort.postMessage({
+      type: "switch-folder",
+      folderId,
+      rootFolderId: folderId
+    });
+    folderPopupRootId = folderId;
+    folderPopupId = folderId;
+    return true;
+  } catch (error) {
+    folderPopupPort = null;
+    folderPopupId = null;
+    folderPopupRootId = null;
+    return false;
+  }
+}
+
+async function switchAdjacentToolbarFolder(direction) {
+  if (!folderPopupPort || !folderPopupRootId || (direction !== -1 && direction !== 1)) {
+    return false;
+  }
+
+  const items = await browser.bookmarks.getChildren(BOOKMARKS_TOOLBAR_ID);
+  const currentIndex = items.findIndex(
+    (item) => item.type === "folder" && item.id === folderPopupRootId
+  );
+  if (currentIndex < 0) return false;
+
+  for (let index = currentIndex + direction; index >= 0 && index < items.length; index += direction) {
+    const item = items[index];
+    if (item.type !== "folder") continue;
+    return switchOpenPopupRootFolder(item.id, index + 1, item);
+  }
+
+  return false;
+}
+
+async function openFolder(folderId) {
+  if (folderPopupPort) {
+    if (folderPopupRootId === folderId) return;
+    if (await switchOpenPopupRootFolder(folderId)) return;
+  }
+
+  const popupPath = `folder.html?id=${encodeURIComponent(folderId)}`;
+  await browser.action.setPopup({ popup: popupPath });
 
   try {
     await browser.action.openPopup();
@@ -100,16 +143,11 @@ async function openFolder(folderId) {
 }
 
 async function openUrlInCurrentTab(url) {
-  const [activeTab] = await browser.tabs.query({
-    active: true,
-    currentWindow: true
-  });
-
+  const [activeTab] = await browser.tabs.query({ active: true, currentWindow: true });
   if (activeTab?.pinned) {
     await browser.tabs.create({ url });
     return;
   }
-
   if (activeTab?.id !== undefined) {
     await browser.tabs.update(activeTab.id, { url });
   } else {
@@ -128,10 +166,7 @@ async function showFeedback(position, item, isFolder) {
   ]);
 
   setTimeout(async () => {
-    if (generation !== feedbackGeneration) {
-      return;
-    }
-
+    if (generation !== feedbackGeneration) return;
     try {
       await Promise.all([
         browser.action.setBadgeText({ text: "" }),

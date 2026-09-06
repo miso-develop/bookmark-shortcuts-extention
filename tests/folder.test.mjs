@@ -44,25 +44,16 @@ test("rejects a non-folder node", async () => {
       throw new Error("must not be called");
     }
   };
-
   await assert.rejects(getFolderData(bookmarks, "bookmark-1"), /Bookmark folder not found/);
 });
 
 test("opens a folder bookmark target in the current tab", async () => {
   const calls = { query: [], update: [], create: [] };
   const tabs = {
-    async query(info) {
-      calls.query.push(info);
-      return [{ id: 7, pinned: false }];
-    },
-    async update(...args) {
-      calls.update.push(args);
-    },
-    async create(options) {
-      calls.create.push(options);
-    }
+    async query(info) { calls.query.push(info); return [{ id: 7, pinned: false }]; },
+    async update(...args) { calls.update.push(args); },
+    async create(options) { calls.create.push(options); }
   };
-
   const result = await openBookmarkUrl(tabs, "https://example.com");
   assert.equal(result, "current-tab");
   assert.deepEqual(calls.update, [[7, { url: "https://example.com" }]]);
@@ -72,18 +63,10 @@ test("opens a folder bookmark target in the current tab", async () => {
 test("forces a folder bookmark target into a new tab", async () => {
   const calls = { query: [], update: [], create: [] };
   const tabs = {
-    async query(info) {
-      calls.query.push(info);
-      return [{ id: 7, pinned: false }];
-    },
-    async update(...args) {
-      calls.update.push(args);
-    },
-    async create(options) {
-      calls.create.push(options);
-    }
+    async query(info) { calls.query.push(info); return [{ id: 7, pinned: false }]; },
+    async update(...args) { calls.update.push(args); },
+    async create(options) { calls.create.push(options); }
   };
-
   const result = await openBookmarkUrl(tabs, "https://example.com", { forceNewTab: true });
   assert.equal(result, "new-tab");
   assert.deepEqual(calls.query, []);
@@ -94,17 +77,10 @@ test("forces a folder bookmark target into a new tab", async () => {
 test("protects a pinned tab when a bookmark is selected from a folder", async () => {
   const calls = { update: [], create: [] };
   const tabs = {
-    async query() {
-      return [{ id: 7, pinned: true }];
-    },
-    async update(...args) {
-      calls.update.push(args);
-    },
-    async create(options) {
-      calls.create.push(options);
-    }
+    async query() { return [{ id: 7, pinned: true }]; },
+    async update(...args) { calls.update.push(args); },
+    async create(options) { calls.create.push(options); }
   };
-
   const result = await openBookmarkUrl(tabs, "https://example.com");
   assert.equal(result, "new-tab");
   assert.deepEqual(calls.update, []);
@@ -152,7 +128,6 @@ test("finds the child folder to restore focus after navigating back", () => {
     { dataset: { itemType: "folder", folderId: "child-a" } },
     { dataset: { itemType: "folder", folderId: "child-b" } }
   ];
-
   assert.equal(findFolderSelectionIndex(items, "child-a"), 1);
   assert.equal(findFolderSelectionIndex(items, "child-b"), 2);
   assert.equal(findFolderSelectionIndex(items, "missing"), -1);
@@ -162,6 +137,8 @@ test("finds the child folder to restore focus after navigating back", () => {
 test("maps popup navigation keys, modifiers, and full-page gestures to actions", () => {
   assert.equal(getKeyboardAction("ArrowDown"), "next");
   assert.equal(getKeyboardAction("ArrowUp"), "previous");
+  assert.equal(getKeyboardAction("ArrowLeft"), "left");
+  assert.equal(getKeyboardAction("ArrowRight"), "right");
   assert.equal(getKeyboardAction("PageDown"), "page-next");
   assert.equal(getKeyboardAction("PageUp"), "page-previous");
   assert.equal(getKeyboardAction("PageDown", { shiftKey: true }), "half-page-next");
@@ -172,7 +149,6 @@ test("maps popup navigation keys, modifiers, and full-page gestures to actions",
   assert.equal(getKeyboardAction("Enter", { ctrlKey: true }), "activate-new-tab");
   assert.equal(getKeyboardAction("Tab", { altKey: true }), "open-full-page");
   assert.equal(getKeyboardAction("Enter", { altKey: true }), "open-full-page");
-  assert.equal(getKeyboardAction("ArrowLeft"), "back");
   assert.equal(getKeyboardAction("Backspace"), "back");
   assert.equal(getKeyboardAction("Escape"), null);
 });

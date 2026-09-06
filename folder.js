@@ -33,35 +33,24 @@ export async function openBookmarkUrl(tabsApi, url, { forceNewTab = false } = {}
 }
 
 export function nextSelectionIndex(currentIndex, itemCount, direction) {
-  if (itemCount <= 0) {
-    return -1;
-  }
-
+  if (itemCount <= 0) return -1;
   if (currentIndex < 0 || currentIndex >= itemCount) {
     return direction < 0 ? itemCount - 1 : 0;
   }
-
   return (currentIndex + direction + itemCount) % itemCount;
 }
 
 export function pageSelectionIndex(currentIndex, itemCount, pageSize, direction) {
-  if (itemCount <= 0) {
-    return -1;
-  }
-
+  if (itemCount <= 0) return -1;
   const step = Math.max(1, Math.floor(pageSize) || 1);
   if (currentIndex < 0 || currentIndex >= itemCount) {
     return direction < 0 ? itemCount - 1 : 0;
   }
-
   return Math.min(itemCount - 1, Math.max(0, currentIndex + direction * step));
 }
 
 export function findFolderSelectionIndex(items, folderId) {
-  if (!folderId) {
-    return -1;
-  }
-
+  if (!folderId) return -1;
   return items.findIndex((item) => item?.dataset?.folderId === folderId);
 }
 
@@ -78,6 +67,10 @@ export function getKeyboardAction(
       return "next";
     case "ArrowUp":
       return "previous";
+    case "ArrowLeft":
+      return "left";
+    case "ArrowRight":
+      return "right";
     case "PageDown":
       return shiftKey ? "half-page-next" : "page-next";
     case "PageUp":
@@ -88,7 +81,6 @@ export function getKeyboardAction(
       return "last";
     case "Enter":
       return ctrlKey ? "activate-new-tab" : "activate";
-    case "ArrowLeft":
     case "Backspace":
       return "back";
     default:
@@ -158,6 +150,7 @@ async function initializeFolderView() {
   }
 
   const history = [];
+  let rootFolderId = initialFolderId;
   let currentFolderId = null;
   let selectableItems = [];
   let selectedIndex = -1;
@@ -190,10 +183,7 @@ async function initializeFolderView() {
 
   function getPageSize() {
     const selected = selectableItems[selectedIndex] || selectableItems[0];
-    if (!selected) {
-      return 1;
-    }
-
+    if (!selected) return 1;
     const itemHeight = Math.max(1, selected.getBoundingClientRect().height || selected.offsetHeight || 1);
     const viewportHeight = Math.max(1, main?.clientHeight || window.innerHeight || itemHeight);
     return Math.max(1, Math.floor(viewportHeight / itemHeight));
@@ -225,9 +215,7 @@ async function initializeFolderView() {
   }
 
   async function activateItem(item, { forceNewTab = false } = {}) {
-    if (!item) {
-      return;
-    }
+    if (!item) return;
 
     if (item.dataset.itemType === "folder" && item.dataset.folderId) {
       await render(item.dataset.folderId, { pushHistory: true });
@@ -249,19 +237,13 @@ async function initializeFolderView() {
     folderId,
     { pushHistory = true, resetHistory = false, focusFolderId = null } = {}
   ) {
-    if (!folderId) {
-      return;
-    }
+    if (!folderId) return;
 
     try {
       const { folder, items } = await getFolderData(browser.bookmarks, folderId);
 
-      if (resetHistory) {
-        history.splice(0, history.length);
-      }
-      if (pushHistory && history.at(-1) !== folder.id) {
-        history.push(folder.id);
-      }
+      if (resetHistory) history.splice(0, history.length);
+      if (pushHistory && history.at(-1) !== folder.id) history.push(folder.id);
 
       currentFolderId = folder.id;
       title.textContent = folder.title || "(無題のフォルダ)";
@@ -269,7 +251,6 @@ async function initializeFolderView() {
       message.hidden = true;
       itemsContainer.hidden = false;
       itemsContainer.replaceChildren();
-
       upButton.hidden = history.length <= 1;
 
       if (items.length === 0) {
@@ -291,13 +272,13 @@ async function initializeFolderView() {
           });
           itemsContainer.append(button);
         }
-
         refreshSelectableItems({ focusFolderId });
       }
 
       popupPort?.postMessage({
         type: "folder-state",
-        folderId: currentFolderId
+        folderId: currentFolderId,
+        rootFolderId
       });
     } catch (error) {
       console.error("Failed to open bookmark folder:", error);
@@ -312,26 +293,23 @@ async function initializeFolderView() {
   }
 
   async function goBack() {
-    if (history.length <= 1) {
-      return false;
-    }
-
+    if (history.length <= 1) return false;
     const childFolderId = history.pop();
-    await render(history.at(-1), {
-      pushHistory: false,
-      focusFolderId: childFolderId
-    });
+    await render(history.at(-1), { pushHistory: false, focusFolderId: childFolderId });
     return true;
   }
 
   async function openFullPageView() {
-    if (!currentFolderId || fullPageView) {
-      return false;
-    }
-
+    if (!currentFolderId || fullPageView) return false;
     const path = buildFolderViewPath(currentFolderId, { fullPage: true });
     await browser.tabs.create({ url: browser.runtime.getURL(path) });
     window.close();
+    return true;
+  }
+
+  function navigateAdjacentRootFolder(direction) {
+    if (fullPageView || !popupPort || history.length !== 1) return false;
+    popupPort.postMessage({ type: "navigate-adjacent-root-folder", direction });
     return true;
   }
 
@@ -351,13 +329,27 @@ async function initializeFolderView() {
       altKey: event.altKey,
       shiftKey: event.shiftKey
     });
-    if (!action) {
-      return;
-    }
+    if (!action) return;
 
     if (action === "open-full-page") {
       event.preventDefault();
       await openFullPageView();
+      return;
+    }
+
+    if (action === "left") {
+      event.preventDefault();
+      if (history.length > 1) {
+        await goBack();
+      } else {
+        navigateAdjacentRootFolder(-1);
+      }
+      return;
+    }
+
+    if (action === "right") {
+      event.preventDefault();
+      navigateAdjacentRootFolder(1);
       return;
     }
 
@@ -369,10 +361,8 @@ async function initializeFolderView() {
     }
 
     if (
-      action === "page-next" ||
-      action === "page-previous" ||
-      action === "half-page-next" ||
-      action === "half-page-previous"
+      action === "page-next" || action === "page-previous" ||
+      action === "half-page-next" || action === "half-page-previous"
     ) {
       event.preventDefault();
       const direction = action.endsWith("next") ? 1 : -1;
@@ -380,25 +370,19 @@ async function initializeFolderView() {
       const step = action.startsWith("half-page")
         ? Math.max(1, Math.ceil(pageSize / 2))
         : pageSize;
-      setSelectedIndex(
-        pageSelectionIndex(selectedIndex, selectableItems.length, step, direction)
-      );
+      setSelectedIndex(pageSelectionIndex(selectedIndex, selectableItems.length, step, direction));
       return;
     }
 
     if (action === "first" || action === "last") {
       event.preventDefault();
-      const targetIndex = action === "first" ? 0 : selectableItems.length - 1;
-      setSelectedIndex(targetIndex);
+      setSelectedIndex(action === "first" ? 0 : selectableItems.length - 1);
       return;
     }
 
     if (action === "activate" || action === "activate-new-tab") {
       const selected = selectableItems[selectedIndex];
-      if (!selected) {
-        return;
-      }
-
+      if (!selected) return;
       event.preventDefault();
       await activateItem(selected, { forceNewTab: action === "activate-new-tab" });
       return;
@@ -411,12 +395,14 @@ async function initializeFolderView() {
   });
 
   popupPort?.onMessage.addListener((message) => {
-    if (message?.type !== "switch-folder" || typeof message.folderId !== "string") {
-      return;
-    }
-    if (message.folderId === currentFolderId) {
-      return;
-    }
+    if (message?.type !== "switch-folder" || typeof message.folderId !== "string") return;
+
+    const nextRootFolderId =
+      typeof message.rootFolderId === "string" ? message.rootFolderId : message.folderId;
+
+    if (message.folderId === currentFolderId && nextRootFolderId === rootFolderId) return;
+
+    rootFolderId = nextRootFolderId;
     render(message.folderId, { pushHistory: true, resetHistory: true });
   });
 
