@@ -5,6 +5,30 @@ const COMMAND_PATTERN = /^open-bookmark(-new)?-(10|[1-9])$/;
 const DEFAULT_ACTION_TITLE = "Bookmark Shortcuts";
 const FEEDBACK_DURATION_MS = 900;
 let feedbackGeneration = 0;
+let folderPopupPort = null;
+let folderPopupId = null;
+
+browser.runtime.onConnect.addListener((port) => {
+  if (port.name !== "folder-popup") {
+    return;
+  }
+
+  folderPopupPort = port;
+  folderPopupId = null;
+
+  port.onMessage.addListener((message) => {
+    if (message?.type === "folder-state" && typeof message.folderId === "string") {
+      folderPopupId = message.folderId;
+    }
+  });
+
+  port.onDisconnect.addListener(() => {
+    if (folderPopupPort === port) {
+      folderPopupPort = null;
+      folderPopupId = null;
+    }
+  });
+});
 
 browser.commands.onCommand.addListener(async (command) => {
   try {
@@ -50,12 +74,28 @@ async function openFolder(folderId) {
   const popupPath = `folder.html?id=${encodeURIComponent(folderId)}`;
   await browser.action.setPopup({ popup: popupPath });
 
+  if (folderPopupPort) {
+    if (folderPopupId === folderId) {
+      return;
+    }
+
+    try {
+      folderPopupPort.postMessage({
+        type: "switch-folder",
+        folderId
+      });
+      return;
+    } catch (error) {
+      folderPopupPort = null;
+      folderPopupId = null;
+    }
+  }
+
   try {
     await browser.action.openPopup();
   } catch (error) {
-    // Some Firefox configurations may prevent a programmatic popup. Keep the
-    // shortcut functional by falling back to the same folder view in a tab.
-    await browser.tabs.create({ url: browser.runtime.getURL(popupPath) });
+    const fullPagePath = `${popupPath}&view=tab`;
+    await browser.tabs.create({ url: browser.runtime.getURL(fullPagePath) });
   }
 }
 
@@ -65,7 +105,6 @@ async function openUrlInCurrentTab(url) {
     currentWindow: true
   });
 
-  // Do not replace a pinned tab. Open the bookmark in a new tab instead.
   if (activeTab?.pinned) {
     await browser.tabs.create({ url });
     return;

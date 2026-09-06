@@ -13,12 +13,26 @@ body {
   color: CanvasText;
 }
 
+body.full-page {
+  width: 100%;
+  min-height: 100vh;
+  max-height: none;
+  overflow: auto;
+}
+
 .header {
   display: flex;
   align-items: center;
   gap: 8px;
   padding: 10px 12px 8px;
   border-bottom: 1px solid color-mix(in srgb, CanvasText 16%, transparent);
+}
+
+.full-page .header {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background: Canvas;
 }
 
 .heading {
@@ -60,24 +74,15 @@ body {
   background: color-mix(in srgb, CanvasText 10%, transparent);
 }
 
-.setting {
-  display: flex;
-  align-items: center;
-  gap: 7px;
-  padding: 7px 12px;
-  border-bottom: 1px solid color-mix(in srgb, CanvasText 12%, transparent);
-  font-size: 0.86em;
-  cursor: pointer;
-  user-select: none;
-}
-
-.setting input {
-  margin: 0;
-}
-
 main {
-  max-height: 420px;
+  max-height: 460px;
   overflow: auto;
+}
+
+.full-page main {
+  max-height: none;
+  min-height: calc(100vh - 56px);
+  overflow: visible;
 }
 
 .message,
@@ -88,6 +93,10 @@ main {
 
 .items {
   padding: 6px;
+}
+
+.full-page .items {
+  padding: 12px;
 }
 
 .item {
@@ -103,8 +112,11 @@ main {
   text-align: left;
 }
 
-.item.keyboard-selected,
-.item:focus-visible {
+.item:focus {
+  outline: none;
+}
+
+.item.keyboard-selected {
   background: color-mix(in srgb, CanvasText 16%, transparent);
   outline: 2px solid color-mix(in srgb, CanvasText 50%, transparent);
   outline-offset: -2px;

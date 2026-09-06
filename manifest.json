@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Bookmark Shortcuts Minimal",
-  "version": "1.3.0",
+  "version": "1.4.0",
   "description": "Open bookmarks toolbar items and folders with Alt+1 through Alt+0.",
   "browser_specific_settings": {
     "gecko": {
@@ -26,6 +26,10 @@
     "default_area": "personaltoolbar",
     "default_icon": "icons/bookmark-shortcuts.svg",
     "default_popup": "folder.html"
+  },
+  "options_ui": {
+    "page": "options.html",
+    "open_in_tab": false
   },
   "commands": {
     "open-bookmark-1": {

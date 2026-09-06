@@ -45,6 +45,16 @@ test("places the feedback action on the Firefox bookmarks toolbar", () => {
   assert.equal(existsSync(resolve(root, manifest.action.default_icon)), true);
 });
 
+test("exposes settings through the Firefox extension options UI", () => {
+  assert.deepEqual(manifest.options_ui, {
+    page: "options.html",
+    open_in_tab: false
+  });
+  assert.equal(existsSync(resolve(root, "options.html")), true);
+  assert.equal(existsSync(resolve(root, "options.js")), true);
+  assert.equal(existsSync(resolve(root, "options.css")), true);
+});
+
 test("declares all 20 keyboard commands with the expected shortcuts", () => {
   assert.equal(Object.keys(manifest.commands).length, 20);
 

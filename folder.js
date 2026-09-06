@@ -1,4 +1,3 @@
-const BOOKMARKS_TOOLBAR_ID = "toolbar_____";
 const ALWAYS_NEW_TAB_KEY = "always-new-tab";
 
 export async function getFolderData(bookmarksApi, folderId) {
@@ -58,7 +57,14 @@ export function pageSelectionIndex(currentIndex, itemCount, pageSize, direction)
   return Math.min(itemCount - 1, Math.max(0, currentIndex + direction * step));
 }
 
-export function getKeyboardAction(key, { ctrlKey = false } = {}) {
+export function getKeyboardAction(
+  key,
+  { ctrlKey = false, altKey = false } = {}
+) {
+  if (altKey && (key === "Tab" || key === "Enter")) {
+    return "open-full-page";
+  }
+
   switch (key) {
     case "ArrowDown":
       return "next";
@@ -82,6 +88,11 @@ export function shouldOpenInNewTab({ ctrlKey = false, alwaysNewTab = false } = {
   return ctrlKey || alwaysNewTab;
 }
 
+export function buildFolderViewPath(folderId, { fullPage = false } = {}) {
+  const path = `folder.html?id=${encodeURIComponent(folderId)}`;
+  return fullPage ? `${path}&view=tab` : path;
+}
+
 function createItemButton(item) {
   const button = document.createElement("button");
   button.type = "button";
@@ -91,6 +102,7 @@ function createItemButton(item) {
   const icon = document.createElement("span");
   icon.className = "item-icon";
   icon.textContent = item.type === "folder" ? "📁" : "🔖";
+  icon.setAttribute("aria-hidden", "true");
 
   const label = document.createElement("span");
   label.className = "item-label";
@@ -123,17 +135,27 @@ async function initializeFolderView() {
   const message = document.getElementById("message");
   const itemsContainer = document.getElementById("items");
   const main = document.querySelector("main");
-  const alwaysNewTabCheckbox = document.getElementById("always-new-tab");
 
-  const initialFolderId = new URLSearchParams(window.location.search).get("id");
+  const params = new URLSearchParams(window.location.search);
+  const initialFolderId = params.get("id");
+  const fullPageView = params.get("view") === "tab";
+  const popupPort = fullPageView ? null : browser.runtime.connect({ name: "folder-popup" });
+
+  if (fullPageView) {
+    document.body.classList.add("full-page");
+  }
+
   const history = [];
+  let currentFolderId = null;
   let selectableItems = [];
   let selectedIndex = -1;
 
-  alwaysNewTabCheckbox.checked = localStorage.getItem(ALWAYS_NEW_TAB_KEY) === "true";
-  alwaysNewTabCheckbox.addEventListener("change", () => {
-    localStorage.setItem(ALWAYS_NEW_TAB_KEY, String(alwaysNewTabCheckbox.checked));
-  });
+  function clearSelection() {
+    for (const item of selectableItems) {
+      item.classList.remove("keyboard-selected");
+    }
+    selectedIndex = -1;
+  }
 
   function setSelectedIndex(index, { focus = true } = {}) {
     for (const item of selectableItems) {
@@ -143,11 +165,12 @@ async function initializeFolderView() {
     selectedIndex = index;
     const selected = selectableItems[selectedIndex];
     if (!selected) {
+      selectedIndex = -1;
       return;
     }
 
     selected.classList.add("keyboard-selected");
-    if (focus) {
+    if (focus && document.activeElement !== selected) {
       selected.focus({ preventScroll: true });
       selected.scrollIntoView({ block: "nearest" });
     }
@@ -169,6 +192,9 @@ async function initializeFolderView() {
 
     selectableItems.forEach((item, index) => {
       item.addEventListener("mouseenter", () => {
+        setSelectedIndex(index, { focus: true });
+      });
+      item.addEventListener("focus", () => {
         setSelectedIndex(index, { focus: false });
       });
     });
@@ -176,8 +202,12 @@ async function initializeFolderView() {
     if (selectableItems.length > 0) {
       setSelectedIndex(0);
     } else {
-      selectedIndex = -1;
+      clearSelection();
     }
+  }
+
+  function alwaysOpenInNewTab() {
+    return localStorage.getItem(ALWAYS_NEW_TAB_KEY) === "true";
   }
 
   async function activateItem(item, { forceNewTab = false } = {}) {
@@ -194,14 +224,14 @@ async function initializeFolderView() {
       await openBookmarkUrl(browser.tabs, item.dataset.url, {
         forceNewTab: shouldOpenInNewTab({
           ctrlKey: forceNewTab,
-          alwaysNewTab: alwaysNewTabCheckbox.checked
+          alwaysNewTab: alwaysOpenInNewTab()
         })
       });
       window.close();
     }
   }
 
-  async function render(folderId, { pushHistory = true } = {}) {
+  async function render(folderId, { pushHistory = true, resetHistory = false } = {}) {
     if (!folderId) {
       return;
     }
@@ -209,10 +239,14 @@ async function initializeFolderView() {
     try {
       const { folder, items } = await getFolderData(browser.bookmarks, folderId);
 
+      if (resetHistory) {
+        history.splice(0, history.length);
+      }
       if (pushHistory && history.at(-1) !== folder.id) {
         history.push(folder.id);
       }
 
+      currentFolderId = folder.id;
       title.textContent = folder.title || "(無題のフォルダ)";
       subtitle.textContent = `${items.length} 件 · ↑↓/PgUp/PgDnで選択 · Enterで開く`;
       message.hidden = true;
@@ -227,23 +261,27 @@ async function initializeFolderView() {
         empty.textContent = "このフォルダは空です。";
         itemsContainer.append(empty);
         refreshSelectableItems();
-        return;
-      }
+      } else {
+        for (const item of items) {
+          if (item.type === "separator") {
+            itemsContainer.append(document.createElement("hr"));
+            continue;
+          }
 
-      for (const item of items) {
-        if (item.type === "separator") {
-          itemsContainer.append(document.createElement("hr"));
-          continue;
+          const button = createItemButton(item);
+          button.addEventListener("click", (event) => {
+            activateItem(button, { forceNewTab: event.ctrlKey });
+          });
+          itemsContainer.append(button);
         }
 
-        const button = createItemButton(item);
-        button.addEventListener("click", (event) => {
-          activateItem(button, { forceNewTab: event.ctrlKey });
-        });
-        itemsContainer.append(button);
+        refreshSelectableItems();
       }
 
-      refreshSelectableItems();
+      popupPort?.postMessage({
+        type: "folder-state",
+        folderId: currentFolderId
+      });
     } catch (error) {
       console.error("Failed to open bookmark folder:", error);
       title.textContent = "フォルダを開けませんでした";
@@ -266,13 +304,39 @@ async function initializeFolderView() {
     return true;
   }
 
+  async function openFullPageView() {
+    if (!currentFolderId || fullPageView) {
+      return false;
+    }
+
+    const path = buildFolderViewPath(currentFolderId, { fullPage: true });
+    await browser.tabs.create({ url: browser.runtime.getURL(path) });
+    window.close();
+    return true;
+  }
+
   upButton.addEventListener("click", () => {
     goBack();
   });
 
+  document.addEventListener("focusin", (event) => {
+    if (!(event.target instanceof Element) || !event.target.closest(".item")) {
+      clearSelection();
+    }
+  });
+
   document.addEventListener("keydown", async (event) => {
-    const action = getKeyboardAction(event.key, { ctrlKey: event.ctrlKey });
+    const action = getKeyboardAction(event.key, {
+      ctrlKey: event.ctrlKey,
+      altKey: event.altKey
+    });
     if (!action) {
+      return;
+    }
+
+    if (action === "open-full-page") {
+      event.preventDefault();
+      await openFullPageView();
       return;
     }
 
@@ -307,6 +371,16 @@ async function initializeFolderView() {
       event.preventDefault();
       await goBack();
     }
+  });
+
+  popupPort?.onMessage.addListener((message) => {
+    if (message?.type !== "switch-folder" || typeof message.folderId !== "string") {
+      return;
+    }
+    if (message.folderId === currentFolderId) {
+      return;
+    }
+    render(message.folderId, { pushHistory: true, resetHistory: true });
   });
 
   if (initialFolderId) {
