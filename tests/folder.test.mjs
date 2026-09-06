@@ -4,6 +4,7 @@ import test from "node:test";
 import {
   buildFolderViewPath,
   findFolderSelectionIndex,
+  findLastBookmarkSelectionIndex,
   getFolderData,
   getKeyboardAction,
   nextSelectionIndex,
@@ -110,6 +111,13 @@ test("moves selection by one visible page and clamps at boundaries", () => {
   assert.equal(pageSelectionIndex(2, 20, 5, -1), 0);
 });
 
+test("moves selection by five items for shift-arrow navigation", () => {
+  assert.equal(pageSelectionIndex(2, 20, 5, 1), 7);
+  assert.equal(pageSelectionIndex(18, 20, 5, 1), 19);
+  assert.equal(pageSelectionIndex(7, 20, 5, -1), 2);
+  assert.equal(pageSelectionIndex(3, 20, 5, -1), 0);
+});
+
 test("moves selection by a half page when given the half-page step", () => {
   assert.equal(pageSelectionIndex(2, 20, 3, 1), 5);
   assert.equal(pageSelectionIndex(5, 20, 3, -1), 2);
@@ -134,9 +142,25 @@ test("finds the child folder to restore focus after navigating back", () => {
   assert.equal(findFolderSelectionIndex(items, null), -1);
 });
 
+test("finds the lowest bookmark while ignoring trailing folders", () => {
+  const items = [
+    { dataset: { itemType: "bookmark" } },
+    { dataset: { itemType: "folder", folderId: "folder-a" } },
+    { dataset: { itemType: "bookmark" } },
+    { dataset: { itemType: "folder", folderId: "folder-b" } }
+  ];
+  assert.equal(findLastBookmarkSelectionIndex(items), 2);
+  assert.equal(
+    findLastBookmarkSelectionIndex([{ dataset: { itemType: "folder", folderId: "only" } }]),
+    -1
+  );
+});
+
 test("maps popup navigation keys, modifiers, and full-page gestures to actions", () => {
   assert.equal(getKeyboardAction("ArrowDown"), "next");
+  assert.equal(getKeyboardAction("ArrowDown", { shiftKey: true }), "jump-next-5");
   assert.equal(getKeyboardAction("ArrowUp"), "previous");
+  assert.equal(getKeyboardAction("ArrowUp", { shiftKey: true }), "jump-previous-5");
   assert.equal(getKeyboardAction("ArrowLeft"), "left");
   assert.equal(getKeyboardAction("ArrowRight"), "right");
   assert.equal(getKeyboardAction("PageDown"), "page-next");
@@ -144,7 +168,7 @@ test("maps popup navigation keys, modifiers, and full-page gestures to actions",
   assert.equal(getKeyboardAction("PageDown", { shiftKey: true }), "half-page-next");
   assert.equal(getKeyboardAction("PageUp", { shiftKey: true }), "half-page-previous");
   assert.equal(getKeyboardAction("Home"), "first");
-  assert.equal(getKeyboardAction("End"), "last");
+  assert.equal(getKeyboardAction("End"), "last-bookmark");
   assert.equal(getKeyboardAction("Enter"), "activate");
   assert.equal(getKeyboardAction("Enter", { ctrlKey: true }), "activate-new-tab");
   assert.equal(getKeyboardAction("Tab", { altKey: true }), "open-full-page");
