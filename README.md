@@ -1,6 +1,6 @@
-**English** | [日本語](README.ja.md)
-
 # Bookmark Shortcuts Minimal
+
+**English** | [日本語](README.ja.md)
 
 A minimal-permission Firefox WebExtension for operating bookmarks on the bookmarks toolbar directly from the keyboard.
 
