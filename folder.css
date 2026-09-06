@@ -74,6 +74,10 @@ body.full-page {
   background: color-mix(in srgb, CanvasText 10%, transparent);
 }
 
+body.keyboard-navigation .item:hover:not(.keyboard-selected) {
+  background: transparent;
+}
+
 main {
   max-height: 460px;
   overflow: auto;
