@@ -4,12 +4,46 @@ const BOOKMARKS_TOOLBAR_ID = "toolbar_____";
 const COMMAND_PATTERN = /^open-bookmark(-new)?-(10|[1-9])$/;
 const DEFAULT_ACTION_TITLE = "Bookmark Shortcuts";
 const FEEDBACK_DURATION_MS = 900;
+const DUPLICATE_SHORTCUT_WINDOW_MS = 100;
+
+const DEFAULT_SHORTCUTS = Object.fromEntries(
+  Array.from({ length: 10 }, (_, index) => {
+    const position = index + 1;
+    const key = position === 10 ? "0" : String(position);
+    return [
+      [`open-bookmark-${position}`, `Alt+${key}`],
+      [`open-bookmark-new-${position}`, `Alt+Shift+${key}`]
+    ];
+  }).flat()
+);
+
 let feedbackGeneration = 0;
 let folderPopupPort = null;
 let folderPopupId = null;
 let folderPopupRootId = null;
+let lastShortcutRequest = null;
 
 browser.runtime.onConnect.addListener((port) => {
+  if (port.name === "shortcut-proxy") {
+    port.onMessage.addListener(async (message) => {
+      if (
+        message?.type !== "invoke-toolbar-shortcut" ||
+        !Number.isInteger(message.position) ||
+        message.position < 1 ||
+        message.position > 10
+      ) {
+        return;
+      }
+
+      try {
+        await requestToolbarShortcut(message.position, Boolean(message.openInNewTab));
+      } catch (error) {
+        console.error("Popup shortcut failed:", error);
+      }
+    });
+    return;
+  }
+
   if (port.name !== "folder-popup") return;
 
   folderPopupPort = port;
@@ -52,30 +86,79 @@ browser.commands.onCommand.addListener(async (command) => {
     const match = COMMAND_PATTERN.exec(command);
     if (!match) return;
 
-    const openInNewTab = Boolean(match[1]);
-    const position = Number(match[2]);
-    const items = await browser.bookmarks.getChildren(BOOKMARKS_TOOLBAR_ID);
-    const item = items[position - 1];
-    if (!item) return;
-
-    if (item.type === "folder") {
-      await showFeedback(position, item, true);
-      await openFolder(item.id);
-      return;
-    }
-
-    if (typeof item.url !== "string") return;
-
-    await showFeedback(position, item, false);
-    if (openInNewTab) {
-      await browser.tabs.create({ url: item.url });
-      return;
-    }
-    await openUrlInCurrentTab(item.url);
+    await requestToolbarShortcut(Number(match[2]), Boolean(match[1]));
   } catch (error) {
     console.error("Bookmark shortcut failed:", error);
   }
 });
+
+repairMissingShortcuts().catch((error) => {
+  console.error("Shortcut repair failed:", error);
+});
+
+async function repairMissingShortcuts() {
+  if (
+    typeof browser.commands?.getAll !== "function" ||
+    typeof browser.commands?.update !== "function"
+  ) {
+    return;
+  }
+
+  const commands = await browser.commands.getAll();
+  for (const command of commands) {
+    const expectedShortcut = DEFAULT_SHORTCUTS[command.name];
+    if (!expectedShortcut || command.shortcut) continue;
+
+    try {
+      await browser.commands.update({
+        name: command.name,
+        shortcut: expectedShortcut
+      });
+    } catch (error) {
+      console.error(`Failed to restore shortcut ${command.name}:`, error);
+    }
+  }
+}
+
+async function requestToolbarShortcut(position, openInNewTab = false) {
+  const now = Date.now();
+  const requestKey = `${position}:${openInNewTab ? 1 : 0}`;
+
+  if (
+    lastShortcutRequest?.key === requestKey &&
+    now - lastShortcutRequest.at < DUPLICATE_SHORTCUT_WINDOW_MS
+  ) {
+    return false;
+  }
+
+  lastShortcutRequest = { key: requestKey, at: now };
+  await executeToolbarShortcut(position, openInNewTab);
+  return true;
+}
+
+async function executeToolbarShortcut(position, openInNewTab = false) {
+  if (!Number.isInteger(position) || position < 1 || position > 10) return;
+
+  const items = await browser.bookmarks.getChildren(BOOKMARKS_TOOLBAR_ID);
+  const item = items[position - 1];
+  if (!item) return;
+
+  if (item.type === "folder") {
+    await showFeedback(position, item, true);
+    await openFolder(item.id);
+    return;
+  }
+
+  if (typeof item.url !== "string") return;
+
+  await showFeedback(position, item, false);
+  if (openInNewTab) {
+    await browser.tabs.create({ url: item.url });
+    return;
+  }
+
+  await openUrlInCurrentTab(item.url);
+}
 
 async function switchOpenPopupRootFolder(folderId, position = null, item = null) {
   if (!folderPopupPort) return false;
