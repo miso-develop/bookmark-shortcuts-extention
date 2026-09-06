@@ -1,0 +1,25 @@
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Bookmark Folder</title>
+    <link rel="stylesheet" href="folder.css">
+  </head>
+  <body>
+    <header class="header">
+      <button id="up" class="up" type="button" aria-label="親フォルダへ" hidden>←</button>
+      <div class="heading">
+        <div id="folder-title" class="folder-title">Bookmark Shortcuts</div>
+        <div id="folder-subtitle" class="folder-subtitle">Alt+数字でブックマークを開きます</div>
+      </div>
+    </header>
+
+    <main>
+      <div id="message" class="message">ショートカットでフォルダを選択すると、ここに内容を表示します。</div>
+      <div id="items" class="items" hidden></div>
+    </main>
+
+    <script type="module" src="folder.js"></script>
+  </body>
+</html>

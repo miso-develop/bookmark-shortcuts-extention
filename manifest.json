@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
   "name": "Bookmark Shortcuts Minimal",
-  "version": "1.0.0",
-  "description": "Open bookmarks toolbar items with Alt+1 through Alt+0.",
+  "version": "1.1.0",
+  "description": "Open bookmarks toolbar items and folders with Alt+1 through Alt+0.",
   "browser_specific_settings": {
     "gecko": {
       "id": "bookmark-shortcuts-extention@miso-develop.github",
@@ -20,6 +20,12 @@
     "scripts": [
       "background.js"
     ]
+  },
+  "action": {
+    "default_title": "Bookmark Shortcuts",
+    "default_area": "personaltoolbar",
+    "default_icon": "icons/bookmark-shortcuts.svg",
+    "default_popup": "folder.html"
   },
   "commands": {
     "open-bookmark-1": {

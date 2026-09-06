@@ -1,21 +1,43 @@
 # Bookmark Shortcuts Minimal
 
-[![Test](https://github.com/miso-develop/bookmark-shortcuts-extention/actions/workflows/test.yml/badge.svg)](https://github.com/miso-develop/bookmark-shortcuts-extention/actions/workflows/test.yml)
-
-Firefox のブックマークツールバーをキーボードから直接開くための、最小構成の WebExtension です。
+Firefox のブックマークツールバーをキーボードから直接操作するための、最小権限の WebExtension です。
 
 ## ショートカット
 
-| ショートカット | 動作 |
-| --- | --- |
-| `Alt+1` ～ `Alt+9` | ブックマークツールバーの左から 1 ～ 9 番目を現在のタブで開く |
-| `Alt+0` | 左から 10 番目を現在のタブで開く |
-| `Alt+Shift+1` ～ `Alt+Shift+9` | 左から 1 ～ 9 番目を新しいタブで開く |
-| `Alt+Shift+0` | 左から 10 番目を新しいタブで開く |
+| ショートカット | 通常ブックマーク | フォルダ |
+| --- | --- | --- |
+| `Alt+1` ～ `Alt+9` | 左から 1 ～ 9 番目を現在のタブで開く | フォルダ内容をポップアップで開く |
+| `Alt+0` | 左から 10 番目を現在のタブで開く | フォルダ内容をポップアップで開く |
+| `Alt+Shift+1` ～ `Alt+Shift+9` | 左から 1 ～ 9 番目を新しいタブで開く | フォルダ内容をポップアップで開く |
+| `Alt+Shift+0` | 左から 10 番目を新しいタブで開く | フォルダ内容をポップアップで開く |
 
 現在のタブがピン留めされている場合は、ピン留めタブを上書きせず新しいタブで開きます。
 
-番号はブックマークツールバー上の表示順に対応します。フォルダーや区切りも位置として数えますが、URL を持たないためショートカットからは開きません。
+番号はブックマークツールバー上の表示順に対応します。フォルダや区切りも位置として数えます。区切りを指定した場合は何もしません。
+
+## フォルダ対応
+
+Firefox の WebExtensions API には、ブックマークツールバー上のネイティブなフォルダメニューそのものをプログラムから展開する API がありません。
+
+そのため本拡張では、ブックマークツールバー上に配置した拡張ボタンから専用ポップアップを開き、対象フォルダの内容を表示します。
+
+- ネストしたフォルダをその場で辿れます。
+- フォルダ内のブックマークをクリックすると現在のタブで開きます。
+- 現在のタブがピン留めされている場合は新しいタブで開きます。
+- ポップアップを開けない環境では、同じフォルダビューを新しいタブで開くフォールバックがあります。
+
+## ブックマークバー上のフィードバック
+
+拡張ボタンは Firefox の `personaltoolbar`、つまりブックマークツールバーに配置されます。
+
+ショートカット実行時、拡張ボタンに約 0.9 秒だけバッジを表示します。
+
+- 通常ブックマーク: `1` ～ `10`
+- フォルダ: `F1` ～ `F10`
+
+同時にボタンのツールチップも対象ブックマーク / フォルダ名へ一時的に切り替わります。
+
+Firefox が以前の拡張ボタン位置を記憶している場合や、ユーザーがボタンを移動した場合は、Firefox の「ツールバーをカスタマイズ」からブックマークツールバーへ戻せます。
 
 ## 権限
 
@@ -27,7 +49,7 @@ Firefox のブックマークツールバーをキーボードから直接開く
 ]
 ```
 
-Bookmarks API でブックマークツールバーの内容を読み取るために必要です。
+Bookmarks API でブックマークツールバーおよびフォルダ内容を読み取るために必要です。
 
 以下の権限は要求しません。
 
@@ -50,52 +72,13 @@ Bookmarks API でブックマークツールバーの内容を読み取るため
 - Firefox 向け Manifest V3
 - AMO 向けに `data_collection_permissions.required = ["none"]` を明示
 
-インストール対象の実行コードは `background.js` だけなので、コード全体を容易に監査できます。
-
-## テスト
-
-Node.js 22 以上で、外部パッケージなしの `node:test` を使用します。
-
-```bash
-npm test
-```
-
-主な検証対象:
-
-- `Alt+1` ～ `Alt+0` 相当のコマンドで正しいツールバー位置を開く
-- 新規タブ用コマンド
-- ピン留めタブを上書きしないこと
-- フォルダー等もツールバー上の位置として数えること
-- 不正なコマンドを無視すること
-- Browser API エラーをコマンドリスナー外へ漏らさないこと
-- Manifest V3 であること
-- 要求権限が `bookmarks` のみに限定されていること
-- `<all_urls>` / `tabs` / `storage` / `activeTab` を要求しないこと
-- 20 個のショートカット定義が期待通りであること
-- データ収集なしの宣言が維持されていること
-
-`tests/background.test.mjs` は Node.js の `vm` 上に Firefox の `browser` API モックを置き、配布対象の `background.js` 自体を読み込んでテストします。本番コードへテスト専用 export は追加していません。
-
-## GitHub Actions
-
-`.github/workflows/test.yml` で `main` への push と Pull Request ごとに `npm test` を実行します。
-
-CI の GitHub Actions 権限は以下に限定しています。
-
-```yaml
-permissions:
-  contents: read
-```
-
-`actions/checkout` と `actions/setup-node` は可変タグではなくコミット SHA に固定しています。
-
 ## 一時インストールして試す
 
 1. このリポジトリを clone または ZIP で取得します。
 2. Firefox で `about:debugging#/runtime/this-firefox` を開きます。
 3. **一時的なアドオンを読み込む** を選択します。
 4. このリポジトリの `manifest.json` を選択します。
-5. ブックマークツールバーの先頭に URL ブックマークを置き、`Alt+1` などを試します。
+5. ブックマークツールバーの先頭 10 項目にブックマークやフォルダを置き、`Alt+1` などを試します。
 
 一時インストールした拡張は Firefox の再起動で削除されます。
 
@@ -110,24 +93,52 @@ Firefox の以下から変更できます。
 
 ブラウザー本体や他の拡張機能が同じキーを使用している場合は、競合するショートカットを変更してください。
 
+## テスト
+
+Node.js 22 以上で以下を実行します。
+
+```bash
+npm test
+```
+
+テストでは以下を検証します。
+
+- 現在タブ / 新規タブでのブックマーク遷移
+- ピン留めタブ保護
+- フォルダのポップアップ表示とフォールバック
+- ネストしたフォルダデータ取得
+- フォルダ内ブックマーク遷移
+- ブックマークバー上のバッジフィードバック
+- 1 ～ 10 番目の位置対応
+- Manifest V3 / 最小権限
+- `personaltoolbar` へのアクション配置
+- 20 個のキーボードショートカット定義
+- データ収集なし宣言
+
+GitHub Actions でも `main` への push と Pull Request ごとに同じテストを実行します。
+
 ## 常用する場合
 
 通常版 Firefox へ永続インストールするには Mozilla の署名が必要です。
 
-この拡張は Manifest V3 の Add-on ID と、AMO 申請用のデータ収集宣言を `manifest.json` に含めています。公開せずに利用する場合は AMO の **Unlisted** 配布として署名済み XPI を取得できます。
+この拡張は Manifest V3 の Add-on ID と AMO 向けデータ収集宣言を `manifest.json` に含めています。公開せずに利用する場合は AMO の **Unlisted** 配布として署名済み XPI を取得できます。
 
 ## ファイル構成
 
 ```text
 .
-├── .github/
-│   └── workflows/
-│       └── test.yml
+├── .github/workflows/test.yml
+├── icons/
+│   └── bookmark-shortcuts.svg
 ├── tests/
 │   ├── background.test.mjs
+│   ├── folder.test.mjs
 │   └── manifest.test.mjs
-├── manifest.json
 ├── background.js
+├── folder.css
+├── folder.html
+├── folder.js
+├── manifest.json
 ├── package.json
 ├── README.md
 └── LICENSE
