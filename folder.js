@@ -1,4 +1,7 @@
+import { parsePopupShortcut } from "./popup-shortcuts.js";
+
 const ALWAYS_NEW_TAB_KEY = "always-new-tab";
+const FIXED_ARROW_JUMP = 5;
 
 export async function getFolderData(bookmarksApi, folderId) {
   const [folder] = await bookmarksApi.get(folderId);
@@ -54,6 +57,15 @@ export function findFolderSelectionIndex(items, folderId) {
   return items.findIndex((item) => item?.dataset?.folderId === folderId);
 }
 
+export function findLastBookmarkSelectionIndex(items) {
+  for (let index = items.length - 1; index >= 0; index -= 1) {
+    if (items[index]?.dataset?.itemType === "bookmark") {
+      return index;
+    }
+  }
+  return -1;
+}
+
 export function getKeyboardAction(
   key,
   { ctrlKey = false, altKey = false, shiftKey = false } = {}
@@ -64,9 +76,9 @@ export function getKeyboardAction(
 
   switch (key) {
     case "ArrowDown":
-      return "next";
+      return shiftKey ? "jump-next-5" : "next";
     case "ArrowUp":
-      return "previous";
+      return shiftKey ? "jump-previous-5" : "previous";
     case "ArrowLeft":
       return "left";
     case "ArrowRight":
@@ -78,7 +90,7 @@ export function getKeyboardAction(
     case "Home":
       return "first";
     case "End":
-      return "last";
+      return "last-bookmark";
     case "Enter":
       return ctrlKey ? "activate-new-tab" : "activate";
     case "Backspace":
@@ -144,6 +156,9 @@ async function initializeFolderView() {
   const initialFolderId = params.get("id");
   const fullPageView = params.get("view") === "tab";
   const popupPort = fullPageView ? null : browser.runtime.connect({ name: "folder-popup" });
+  const shortcutProxyPort = fullPageView
+    ? null
+    : browser.runtime.connect({ name: "shortcut-proxy" });
 
   if (fullPageView) {
     document.body.classList.add("full-page");
@@ -154,6 +169,12 @@ async function initializeFolderView() {
   let currentFolderId = null;
   let selectableItems = [];
   let selectedIndex = -1;
+  let keyboardNavigationActive = false;
+
+  function setKeyboardNavigation(active) {
+    keyboardNavigationActive = active;
+    document.body.classList.toggle("keyboard-navigation", active);
+  }
 
   function clearSelection() {
     for (const item of selectableItems) {
@@ -193,7 +214,8 @@ async function initializeFolderView() {
     selectableItems = Array.from(itemsContainer.querySelectorAll(".item:not(:disabled)"));
 
     selectableItems.forEach((item, index) => {
-      item.addEventListener("mouseenter", () => {
+      item.addEventListener("pointermove", () => {
+        setKeyboardNavigation(false);
         setSelectedIndex(index, { focus: true });
       });
       item.addEventListener("focus", () => {
@@ -247,7 +269,7 @@ async function initializeFolderView() {
 
       currentFolderId = folder.id;
       title.textContent = folder.title || "(無題のフォルダ)";
-      subtitle.textContent = `${items.length} 件 · ↑↓/PgUp/PgDn/Home/Endで選択 · Enterで開く`;
+      subtitle.textContent = `${items.length} 件 · ↑↓/Shift+↑↓/PgUp/PgDn/Home/Endで選択 · Enterで開く`;
       message.hidden = true;
       itemsContainer.hidden = false;
       itemsContainer.replaceChildren();
@@ -323,40 +345,76 @@ async function initializeFolderView() {
     }
   });
 
-  document.addEventListener("keydown", async (event) => {
+  window.addEventListener("keydown", async (event) => {
+    if (event.key === "Escape") {
+      return;
+    }
+
+    const plainTab =
+      event.key === "Tab" && !event.ctrlKey && !event.altKey && !event.metaKey;
+    const popupShortcut = fullPageView ? null : parsePopupShortcut(event);
     const action = getKeyboardAction(event.key, {
       ctrlKey: event.ctrlKey,
       altKey: event.altKey,
       shiftKey: event.shiftKey
     });
-    if (!action) return;
+
+    if (!fullPageView) {
+      setKeyboardNavigation(true);
+      if (plainTab) {
+        return;
+      }
+      event.preventDefault();
+      event.stopImmediatePropagation();
+    } else if (popupShortcut || action) {
+      setKeyboardNavigation(true);
+      event.preventDefault();
+      event.stopImmediatePropagation();
+    } else {
+      return;
+    }
+
+    if (popupShortcut && shortcutProxyPort) {
+      shortcutProxyPort.postMessage({
+        type: "invoke-toolbar-shortcut",
+        position: popupShortcut.position,
+        openInNewTab: popupShortcut.openInNewTab
+      });
+      return;
+    }
+
+    if (!action) {
+      return;
+    }
 
     if (action === "open-full-page") {
-      event.preventDefault();
       await openFullPageView();
       return;
     }
 
     if (action === "left") {
-      event.preventDefault();
-      if (history.length > 1) {
-        await goBack();
-      } else {
+      if (history.length === 1) {
         navigateAdjacentRootFolder(-1);
       }
       return;
     }
 
     if (action === "right") {
-      event.preventDefault();
       navigateAdjacentRootFolder(1);
       return;
     }
 
     if (action === "next" || action === "previous") {
-      event.preventDefault();
       const direction = action === "next" ? 1 : -1;
       setSelectedIndex(nextSelectionIndex(selectedIndex, selectableItems.length, direction));
+      return;
+    }
+
+    if (action === "jump-next-5" || action === "jump-previous-5") {
+      const direction = action === "jump-next-5" ? 1 : -1;
+      setSelectedIndex(
+        pageSelectionIndex(selectedIndex, selectableItems.length, FIXED_ARROW_JUMP, direction)
+      );
       return;
     }
 
@@ -364,7 +422,6 @@ async function initializeFolderView() {
       action === "page-next" || action === "page-previous" ||
       action === "half-page-next" || action === "half-page-previous"
     ) {
-      event.preventDefault();
       const direction = action.endsWith("next") ? 1 : -1;
       const pageSize = getPageSize();
       const step = action.startsWith("half-page")
@@ -374,25 +431,30 @@ async function initializeFolderView() {
       return;
     }
 
-    if (action === "first" || action === "last") {
-      event.preventDefault();
-      setSelectedIndex(action === "first" ? 0 : selectableItems.length - 1);
+    if (action === "first") {
+      setSelectedIndex(0);
+      return;
+    }
+
+    if (action === "last-bookmark") {
+      const lastBookmarkIndex = findLastBookmarkSelectionIndex(selectableItems);
+      if (lastBookmarkIndex >= 0) {
+        setSelectedIndex(lastBookmarkIndex);
+      }
       return;
     }
 
     if (action === "activate" || action === "activate-new-tab") {
       const selected = selectableItems[selectedIndex];
       if (!selected) return;
-      event.preventDefault();
       await activateItem(selected, { forceNewTab: action === "activate-new-tab" });
       return;
     }
 
     if (action === "back" && history.length > 1) {
-      event.preventDefault();
       await goBack();
     }
-  });
+  }, true);
 
   popupPort?.onMessage.addListener((message) => {
     if (message?.type !== "switch-folder" || typeof message.folderId !== "string") return;
