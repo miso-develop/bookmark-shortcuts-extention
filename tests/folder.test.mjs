@@ -1,7 +1,12 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { getFolderData, openBookmarkUrl } from "../folder.js";
+import {
+  getFolderData,
+  getKeyboardAction,
+  nextSelectionIndex,
+  openBookmarkUrl
+} from "../folder.js";
 
 test("loads a bookmark folder and its children", async () => {
   const calls = { get: [], getChildren: [] };
@@ -85,4 +90,29 @@ test("protects a pinned tab when a bookmark is selected from a folder", async ()
   assert.equal(result, "new-tab");
   assert.deepEqual(calls.update, []);
   assert.deepEqual(calls.create, [{ url: "https://example.com" }]);
+});
+
+test("moves selection down and wraps at the end", () => {
+  assert.equal(nextSelectionIndex(0, 3, 1), 1);
+  assert.equal(nextSelectionIndex(2, 3, 1), 0);
+});
+
+test("moves selection up and wraps at the beginning", () => {
+  assert.equal(nextSelectionIndex(2, 3, -1), 1);
+  assert.equal(nextSelectionIndex(0, 3, -1), 2);
+});
+
+test("starts keyboard selection naturally when nothing is selected", () => {
+  assert.equal(nextSelectionIndex(-1, 3, 1), 0);
+  assert.equal(nextSelectionIndex(-1, 3, -1), 2);
+  assert.equal(nextSelectionIndex(-1, 0, 1), -1);
+});
+
+test("maps popup navigation keys to actions", () => {
+  assert.equal(getKeyboardAction("ArrowDown"), "next");
+  assert.equal(getKeyboardAction("ArrowUp"), "previous");
+  assert.equal(getKeyboardAction("Enter"), "activate");
+  assert.equal(getKeyboardAction("ArrowLeft"), "back");
+  assert.equal(getKeyboardAction("Backspace"), "back");
+  assert.equal(getKeyboardAction("Escape"), null);
 });

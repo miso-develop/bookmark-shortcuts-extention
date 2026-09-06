@@ -27,6 +27,34 @@ export async function openBookmarkUrl(tabsApi, url) {
   return "current-tab";
 }
 
+export function nextSelectionIndex(currentIndex, itemCount, direction) {
+  if (itemCount <= 0) {
+    return -1;
+  }
+
+  if (currentIndex < 0 || currentIndex >= itemCount) {
+    return direction < 0 ? itemCount - 1 : 0;
+  }
+
+  return (currentIndex + direction + itemCount) % itemCount;
+}
+
+export function getKeyboardAction(key) {
+  switch (key) {
+    case "ArrowDown":
+      return "next";
+    case "ArrowUp":
+      return "previous";
+    case "Enter":
+      return "activate";
+    case "ArrowLeft":
+    case "Backspace":
+      return "back";
+    default:
+      return null;
+  }
+}
+
 function createItemButton(item, onFolderOpen) {
   const button = document.createElement("button");
   button.type = "button";
@@ -70,31 +98,71 @@ async function initializeFolderView() {
   const message = document.getElementById("message");
   const itemsContainer = document.getElementById("items");
 
-  let currentFolderId = new URLSearchParams(window.location.search).get("id");
+  const initialFolderId = new URLSearchParams(window.location.search).get("id");
+  const history = [];
+  let selectableItems = [];
+  let selectedIndex = -1;
 
-  async function render(folderId) {
+  function setSelectedIndex(index, { focus = true } = {}) {
+    for (const item of selectableItems) {
+      item.classList.remove("keyboard-selected");
+    }
+
+    selectedIndex = index;
+    const selected = selectableItems[selectedIndex];
+    if (!selected) {
+      return;
+    }
+
+    selected.classList.add("keyboard-selected");
+    if (focus) {
+      selected.focus({ preventScroll: true });
+      selected.scrollIntoView({ block: "nearest" });
+    }
+  }
+
+  function refreshSelectableItems() {
+    selectableItems = Array.from(itemsContainer.querySelectorAll(".item:not(:disabled)"));
+
+    selectableItems.forEach((item, index) => {
+      item.addEventListener("mouseenter", () => {
+        setSelectedIndex(index, { focus: false });
+      });
+    });
+
+    if (selectableItems.length > 0) {
+      setSelectedIndex(0);
+    } else {
+      selectedIndex = -1;
+    }
+  }
+
+  async function render(folderId, { pushHistory = true } = {}) {
     if (!folderId) {
       return;
     }
 
     try {
       const { folder, items } = await getFolderData(browser.bookmarks, folderId);
-      currentFolderId = folder.id;
+
+      if (pushHistory && history.at(-1) !== folder.id) {
+        history.push(folder.id);
+      }
 
       title.textContent = folder.title || "(無題のフォルダ)";
-      subtitle.textContent = `${items.length} 件`;
+      subtitle.textContent = `${items.length} 件 · ↑↓で選択 / Enterで開く`;
       message.hidden = true;
       itemsContainer.hidden = false;
       itemsContainer.replaceChildren();
 
-      upButton.hidden = !folder.parentId;
-      upButton.dataset.parentId = folder.parentId || "";
+      upButton.hidden = history.length <= 1;
 
       if (items.length === 0) {
         const empty = document.createElement("div");
         empty.className = "empty";
         empty.textContent = "このフォルダは空です。";
         itemsContainer.append(empty);
+        refreshSelectableItems();
         return;
       }
 
@@ -104,8 +172,12 @@ async function initializeFolderView() {
           continue;
         }
 
-        itemsContainer.append(createItemButton(item, render));
+        itemsContainer.append(createItemButton(item, (childFolderId) => {
+          render(childFolderId, { pushHistory: true });
+        }));
       }
+
+      refreshSelectableItems();
     } catch (error) {
       console.error("Failed to open bookmark folder:", error);
       title.textContent = "フォルダを開けませんでした";
@@ -113,25 +185,57 @@ async function initializeFolderView() {
       message.textContent = String(error);
       message.hidden = false;
       itemsContainer.hidden = true;
+      selectableItems = [];
+      selectedIndex = -1;
     }
   }
 
-  upButton.addEventListener("click", async () => {
-    if (!currentFolderId) {
-      return;
+  async function goBack() {
+    if (history.length <= 1) {
+      return false;
     }
 
-    const [folder] = await browser.bookmarks.get(currentFolderId);
-    if (!folder?.parentId || folder.parentId === BOOKMARKS_TOOLBAR_ID) {
-      window.close();
-      return;
-    }
+    history.pop();
+    await render(history.at(-1), { pushHistory: false });
+    return true;
+  }
 
-    await render(folder.parentId);
+  upButton.addEventListener("click", () => {
+    goBack();
   });
 
-  if (currentFolderId) {
-    await render(currentFolderId);
+  document.addEventListener("keydown", async (event) => {
+    const action = getKeyboardAction(event.key);
+    if (!action) {
+      return;
+    }
+
+    if (action === "next" || action === "previous") {
+      event.preventDefault();
+      const direction = action === "next" ? 1 : -1;
+      setSelectedIndex(nextSelectionIndex(selectedIndex, selectableItems.length, direction));
+      return;
+    }
+
+    if (action === "activate") {
+      const selected = selectableItems[selectedIndex];
+      if (!selected) {
+        return;
+      }
+
+      event.preventDefault();
+      selected.click();
+      return;
+    }
+
+    if (action === "back" && history.length > 1) {
+      event.preventDefault();
+      await goBack();
+    }
+  });
+
+  if (initialFolderId) {
+    await render(initialFolderId, { pushHistory: true });
   }
 }
 

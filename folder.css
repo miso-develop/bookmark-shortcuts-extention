@@ -88,6 +88,13 @@ main {
   text-align: left;
 }
 
+.item.keyboard-selected,
+.item:focus-visible {
+  background: color-mix(in srgb, CanvasText 16%, transparent);
+  outline: 2px solid color-mix(in srgb, CanvasText 50%, transparent);
+  outline-offset: -2px;
+}
+
 .item:disabled {
   cursor: default;
   opacity: 0.5;
