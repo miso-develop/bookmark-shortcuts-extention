@@ -60,8 +60,23 @@ body {
   background: color-mix(in srgb, CanvasText 10%, transparent);
 }
 
+.setting {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 7px 12px;
+  border-bottom: 1px solid color-mix(in srgb, CanvasText 12%, transparent);
+  font-size: 0.86em;
+  cursor: pointer;
+  user-select: none;
+}
+
+.setting input {
+  margin: 0;
+}
+
 main {
-  max-height: 460px;
+  max-height: 420px;
   overflow: auto;
 }
 

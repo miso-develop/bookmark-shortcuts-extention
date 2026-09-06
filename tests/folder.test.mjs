@@ -5,7 +5,9 @@ import {
   getFolderData,
   getKeyboardAction,
   nextSelectionIndex,
-  openBookmarkUrl
+  openBookmarkUrl,
+  pageSelectionIndex,
+  shouldOpenInNewTab
 } from "../folder.js";
 
 test("loads a bookmark folder and its children", async () => {
@@ -42,10 +44,7 @@ test("rejects a non-folder node", async () => {
     }
   };
 
-  await assert.rejects(
-    getFolderData(bookmarks, "bookmark-1"),
-    /Bookmark folder not found/
-  );
+  await assert.rejects(getFolderData(bookmarks, "bookmark-1"), /Bookmark folder not found/);
 });
 
 test("opens a folder bookmark target in the current tab", async () => {
@@ -69,6 +68,29 @@ test("opens a folder bookmark target in the current tab", async () => {
   assert.deepEqual(calls.query, [{ active: true, currentWindow: true }]);
   assert.deepEqual(calls.update, [[7, { url: "https://example.com" }]]);
   assert.deepEqual(calls.create, []);
+});
+
+test("forces a folder bookmark target into a new tab", async () => {
+  const calls = { query: [], update: [], create: [] };
+  const tabs = {
+    async query(info) {
+      calls.query.push(info);
+      return [{ id: 7, pinned: false }];
+    },
+    async update(...args) {
+      calls.update.push(args);
+    },
+    async create(options) {
+      calls.create.push(options);
+    }
+  };
+
+  const result = await openBookmarkUrl(tabs, "https://example.com", { forceNewTab: true });
+
+  assert.equal(result, "new-tab");
+  assert.deepEqual(calls.query, []);
+  assert.deepEqual(calls.update, []);
+  assert.deepEqual(calls.create, [{ url: "https://example.com" }]);
 });
 
 test("protects a pinned tab when a bookmark is selected from a folder", async () => {
@@ -108,11 +130,34 @@ test("starts keyboard selection naturally when nothing is selected", () => {
   assert.equal(nextSelectionIndex(-1, 0, 1), -1);
 });
 
-test("maps popup navigation keys to actions", () => {
+test("moves selection by one visible page and clamps at boundaries", () => {
+  assert.equal(pageSelectionIndex(2, 20, 6, 1), 8);
+  assert.equal(pageSelectionIndex(18, 20, 6, 1), 19);
+  assert.equal(pageSelectionIndex(8, 20, 6, -1), 2);
+  assert.equal(pageSelectionIndex(2, 20, 6, -1), 0);
+});
+
+test("page selection starts naturally when nothing is selected", () => {
+  assert.equal(pageSelectionIndex(-1, 20, 6, 1), 0);
+  assert.equal(pageSelectionIndex(-1, 20, 6, -1), 19);
+  assert.equal(pageSelectionIndex(-1, 0, 6, 1), -1);
+});
+
+test("maps popup navigation keys and ctrl-enter to actions", () => {
   assert.equal(getKeyboardAction("ArrowDown"), "next");
   assert.equal(getKeyboardAction("ArrowUp"), "previous");
+  assert.equal(getKeyboardAction("PageDown"), "page-next");
+  assert.equal(getKeyboardAction("PageUp"), "page-previous");
   assert.equal(getKeyboardAction("Enter"), "activate");
+  assert.equal(getKeyboardAction("Enter", { ctrlKey: true }), "activate-new-tab");
   assert.equal(getKeyboardAction("ArrowLeft"), "back");
   assert.equal(getKeyboardAction("Backspace"), "back");
   assert.equal(getKeyboardAction("Escape"), null);
+});
+
+test("resolves ctrl-enter and the persistent new-tab option", () => {
+  assert.equal(shouldOpenInNewTab(), false);
+  assert.equal(shouldOpenInNewTab({ ctrlKey: true }), true);
+  assert.equal(shouldOpenInNewTab({ alwaysNewTab: true }), true);
+  assert.equal(shouldOpenInNewTab({ ctrlKey: true, alwaysNewTab: true }), true);
 });
