@@ -4,7 +4,6 @@ import test from "node:test";
 import {
   buildFolderViewPath,
   findFolderSelectionIndex,
-  findLastBookmarkSelectionIndex,
   getFolderData,
   getKeyboardAction,
   nextSelectionIndex,
@@ -142,20 +141,6 @@ test("finds the child folder to restore focus after navigating back", () => {
   assert.equal(findFolderSelectionIndex(items, null), -1);
 });
 
-test("finds the lowest bookmark while ignoring trailing folders", () => {
-  const items = [
-    { dataset: { itemType: "bookmark" } },
-    { dataset: { itemType: "folder", folderId: "folder-a" } },
-    { dataset: { itemType: "bookmark" } },
-    { dataset: { itemType: "folder", folderId: "folder-b" } }
-  ];
-  assert.equal(findLastBookmarkSelectionIndex(items), 2);
-  assert.equal(
-    findLastBookmarkSelectionIndex([{ dataset: { itemType: "folder", folderId: "only" } }]),
-    -1
-  );
-});
-
 test("maps popup navigation keys, modifiers, and full-page gestures to actions", () => {
   assert.equal(getKeyboardAction("ArrowDown"), "next");
   assert.equal(getKeyboardAction("ArrowDown", { shiftKey: true }), "jump-next-5");
@@ -168,7 +153,7 @@ test("maps popup navigation keys, modifiers, and full-page gestures to actions",
   assert.equal(getKeyboardAction("PageDown", { shiftKey: true }), "half-page-next");
   assert.equal(getKeyboardAction("PageUp", { shiftKey: true }), "half-page-previous");
   assert.equal(getKeyboardAction("Home"), "first");
-  assert.equal(getKeyboardAction("End"), "last-bookmark");
+  assert.equal(getKeyboardAction("End"), "last");
   assert.equal(getKeyboardAction("Enter"), "activate");
   assert.equal(getKeyboardAction("Enter", { ctrlKey: true }), "activate-new-tab");
   assert.equal(getKeyboardAction("Tab", { altKey: true }), "open-full-page");
