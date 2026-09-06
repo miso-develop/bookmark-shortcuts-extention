@@ -1,79 +1,81 @@
+**English** | [日本語](README.ja.md)
+
 # Bookmark Shortcuts Minimal
 
-Firefox のブックマークツールバーをキーボードから直接操作する、最小権限の WebExtension です。
+A minimal-permission Firefox WebExtension for operating bookmarks on the bookmarks toolbar directly from the keyboard.
 
-## 基本ショートカット
+## Basic shortcuts
 
-| ショートカット | 動作 |
+| Shortcut | Action |
 | --- | --- |
-| `Alt+1` ～ `Alt+9` | ブックマークツールバー左から 1 ～ 9 番目を開く |
-| `Alt+0` | 10 番目を開く |
-| `Alt+Shift+1` ～ `Alt+Shift+0` | 通常ブックマークなら新しいタブで開く |
+| `Alt+1` through `Alt+9` | Open the 1st through 9th item on the bookmarks toolbar |
+| `Alt+0` | Open the 10th item |
+| `Alt+Shift+1` through `Alt+Shift+0` | Open a regular bookmark in a new tab |
 
-対象がフォルダの場合は専用ポップアップを開きます。フォルダや区切りもブックマークツールバー上の位置として数えます。
+If the target item is a folder, the extension opens a dedicated folder popup. Folders and separators count as positions on the bookmarks toolbar.
 
-## フォルダポップアップ
+## Folder popup
 
-- `↑` / `↓`: 1 項目ずつ選択
-- `Shift+↑` / `Shift+↓`: 5 項目ずつ選択を移動。端では先頭 / 末尾で停止
-- `PageUp` / `PageDown`: 約 1 画面分選択を移動
-- `Shift+PageUp` / `Shift+PageDown`: 通常ページ移動の約半分だけ選択を移動
-- `Home`: 先頭の選択可能項目へ移動
-- `End`: 最後の選択可能項目へ移動
-- `Enter`: 選択中のブックマークを開く / フォルダへ入る
-- `Ctrl+Enter`: ブックマークを新しいタブで開く
-- ルートフォルダで `←` / `→`: ブックマークツールバー上の前 / 次のフォルダへポップアップ内容を切り替える。通常ブックマークや区切りは飛ばし、端では循環しない
-- サブフォルダで `←` / `→`: 何もしない
-- `Backspace`: 親フォルダへ戻る
-- 戻るボタン: 親フォルダへ戻る
-- `Alt+Enter`: 現在のフォルダ内容を新しいタブの全画面レイアウトで開く
-- `Alt+Tab`: ポップアップがキーイベントを受け取れた場合は同じ全画面タブ表示を実行します。ただし Windows では Alt+Tab は OS のウィンドウ切替が優先されるため、通常は拡張側で取得できません。
+- `↑` / `↓`: Move the selection by 1 item
+- `Shift+↑` / `Shift+↓`: Move the selection by 5 items, clamped at the beginning or end
+- `PageUp` / `PageDown`: Move the selection by approximately one visible page
+- `Shift+PageUp` / `Shift+PageDown`: Move the selection by approximately half of the normal page step
+- `Home`: Move to the first selectable item
+- `End`: Move to the last selectable item
+- `Enter`: Open the selected bookmark or enter the selected folder
+- `Ctrl+Enter`: Open the selected bookmark in a new tab
+- `←` / `→` at a root folder: Switch the popup to the previous / next folder on the bookmarks toolbar. Regular bookmarks and separators are skipped, and navigation does not wrap at either end
+- `←` / `→` inside a subfolder: Do nothing
+- `Backspace`: Return to the parent folder
+- Back button: Return to the parent folder
+- `Alt+Enter`: Open the current folder in a full-page layout in a new tab
+- `Alt+Tab`: If the popup receives the key event, perform the same full-page action. On Windows, however, the OS normally handles Alt+Tab first, so the extension usually cannot receive it
 
-`PageUp` / `PageDown` / `Shift+PageUp` / `Shift+PageDown` / `Shift+↑` / `Shift+↓` / `Home` / `End` は、スクロールだけでなく移動先へ実フォーカスも移します。
+`PageUp` / `PageDown` / `Shift+PageUp` / `Shift+PageDown` / `Shift+↑` / `Shift+↓` / `Home` / `End` move both the selection and the actual keyboard focus to the destination item.
 
-サブフォルダへ入ってから `Backspace` / 戻るボタンで親へ戻った場合は、親フォルダ内の「今戻ってきたサブフォルダ」項目へ選択状態と実フォーカスを復元します。
+When returning from a subfolder with `Backspace` or the Back button, the extension restores both the selection and actual focus to the subfolder item you just returned from.
 
-### マウスとキーボードのフォーカス優先順位
+### Mouse and keyboard focus priority
 
-マウスを実際に動かして項目上を移動したときは、その項目へ選択とフォーカスを同期します。その後にキーボード入力があった場合はキーボード選択を優先します。マウスカーソルが以前の項目上に静止していても、キー入力後に古い hover 表示が選択を奪い返さないようにしています。
+When the pointer actually moves over an item, the extension synchronizes selection and focus to that item. If a keyboard input occurs afterward, keyboard navigation takes priority. A stationary mouse pointer over a previously selected item does not take the selection back after keyboard navigation.
 
-`Tab` / `Shift+Tab` によるポップアップ内フォーカス移動も維持します。
+`Tab` / `Shift+Tab` focus navigation within the popup is also preserved.
 
-### ポップアップを開いたまま別のショートカットを押した場合
+### Pressing shortcuts while the popup is already open
 
-フォルダポップアップと background script は `runtime.Port` で接続されています。
+The folder popup and background script are connected through `runtime.Port`.
 
-- 同じブックマークツールバー上のルートフォルダのショートカット: サブフォルダ表示中でも何もしない
-- 別のフォルダのショートカット: 新しいタブを開かず、現在のポップアップ内容を切り替える
-- ルートフォルダ表示中の `←` / `→`: 前後に存在するフォルダへ同じポップアップ内で切り替える
+- Pressing the shortcut for the same root folder on the bookmarks toolbar: Does nothing, even while a subfolder is displayed
+- Pressing the shortcut for a different folder: Switches the existing popup to that folder without opening a new tab
+- Pressing `←` / `→` while a root folder is displayed: Switches the same popup to the previous / next available folder
 
-ポップアップを開けない環境では、同じフォルダビューを全画面レイアウトの新しいタブで開きます。
+If the popup cannot be opened, the extension falls back to opening the same folder view in a full-page layout in a new tab.
 
-### ブラウザーショートカットの抑止
+### Suppressing browser shortcuts
 
-専用ポップアップがキーイベントを受信できた場合、`Esc` と通常の `Tab` / `Shift+Tab` 以外は capture phase で `preventDefault()` / `stopImmediatePropagation()` し、Firefox 側の操作へ伝播しないようにしています。`Ctrl+Tab` もイベントがポップアップへ届けば抑止します。
+When the dedicated popup receives a key event, every key except `Esc` and plain `Tab` / `Shift+Tab` is handled in the capture phase with `preventDefault()` / `stopImmediatePropagation()` so that it does not propagate to Firefox. `Ctrl+Tab` is also suppressed if the event reaches the popup.
 
-ただし Firefox 自身が予約しているショートカットは WebExtension より先にブラウザー UI 側で処理される場合があります。特に `Ctrl+Tab` のようなブラウザー予約キーは DOM `keydown` 自体がポップアップへ届かない場合があり、その場合は WebExtension から完全には無効化できません。この制約は Firefox / WebExtensions の仕様によるものです。
+However, Firefox may process browser-reserved shortcuts before a WebExtension receives them. In particular, reserved shortcuts such as `Ctrl+Tab` may never produce a DOM `keydown` event in the popup. In that case, a WebExtension cannot fully disable the shortcut. This is a Firefox / WebExtensions platform limitation.
 
-`Esc` はポップアップを閉じるため Firefox 側へそのまま渡します。
+`Esc` is intentionally left to Firefox so it can close the popup.
 
-## 設定
+## Settings
 
-設定はフォルダポップアップには表示しません。Firefox のアドオン管理画面からこの拡張の設定を開いて変更します。
+Settings are not shown in the folder popup. Open the extension settings from Firefox's Add-ons Manager instead.
 
-現在の設定:
+Current setting:
 
-- **Enterで常に新しいタブで開く**
+- **Always open with Enter in a new tab**
 
-設定値は拡張自身の `localStorage` に保存するため、`storage` 権限は要求しません。
+The setting is stored in the extension's own `localStorage`, so the extension does not request the `storage` permission.
 
-## アイコン
+## Icons
 
-Firefox の Bookmarks API は保存済みブックマークの favicon を返しません。外部 favicon サービスへブックマーク URL を送信する実装はプライバシー上採用していないため、現在はフォルダ / ブックマークの汎用アイコンを表示します。
+Firefox's Bookmarks API does not expose stored favicons for bookmarks. To avoid sending bookmark URLs to an external favicon service, the extension currently uses generic folder / bookmark icons.
 
-## 権限
+## Permissions
 
-要求する権限は `bookmarks` のみです。
+The extension requests only the `bookmarks` permission.
 
 ```json
 "permissions": [
@@ -81,7 +83,7 @@ Firefox の Bookmarks API は保存済みブックマークの favicon を返し
 ]
 ```
 
-以下は要求しません。
+It does not request:
 
 - `tabs`
 - `storage`
@@ -89,40 +91,40 @@ Firefox の Bookmarks API は保存済みブックマークの favicon を返し
 - `<all_urls>`
 - host permissions
 
-Content Script、外部通信、データ収集もありません。
+There are also no content scripts, external network requests, or data collection.
 
-## 一時インストール
+## Temporary installation
 
-1. リポジトリを clone または ZIP で取得
-2. Firefox で `about:debugging#/runtime/this-firefox` を開く
-3. **一時的なアドオンを読み込む**
-4. `manifest.json` を選択
+1. Clone the repository or download it as a ZIP file
+2. Open `about:debugging#/runtime/this-firefox` in Firefox
+3. Choose **Load Temporary Add-on...**
+4. Select `manifest.json`
 
-変更後は同じ画面から **再読み込み** してください。
+After making changes, reload the extension from the same page.
 
-## ショートカット変更
+## Changing shortcuts
 
-`about:addons` → 歯車メニュー → **拡張機能のショートカットキーの管理** から変更できます。
+Open `about:addons` → gear menu → **Manage Extension Shortcuts**.
 
-## テスト
+## Tests
 
-Node.js 22 以上:
+Node.js 22 or later:
 
 ```bash
 npm test
 ```
 
-GitHub Actions でも `main` への push と Pull Request ごとに同じテストを実行します。
+GitHub Actions runs the same test suite on every push to `main` and on pull requests.
 
-## 常用する場合
+## Permanent installation
 
-通常版 Firefox へ永続インストールするには Mozilla の署名が必要です。公開せずに使う場合は AMO の Unlisted 配布として署名済み XPI を取得できます。
+Standard Firefox builds require Mozilla signing for permanent installation. For private use without public listing, you can submit the extension to AMO as an Unlisted add-on and obtain a signed XPI.
 
-## 参考
+## Reference
 
 - https://github.com/mortalis13/Bookmark-Shortcuts
 
-既存プロジェクトのコードをコピーせず、必要な WebExtensions API のみで再実装しています。
+This project was independently reimplemented using only the WebExtensions APIs required for the functionality, rather than copying code from the referenced project.
 
 ## License
 
