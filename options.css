@@ -67,6 +67,19 @@ code {
   font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
 }
 
+.chrome-shortcuts-link {
+  color: LinkText;
+  cursor: pointer;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.shortcut-summary {
+  display: inline-block;
+  margin-bottom: 2px;
+  font-weight: 600;
+}
+
 .shortcut-list {
   display: grid;
   gap: 4px;
@@ -76,15 +89,33 @@ code {
 }
 
 .shortcut-list li {
-  display: flex;
-  justify-content: space-between;
-  gap: 16px;
-  padding: 5px 8px;
   border-radius: 5px;
 }
 
 .shortcut-list li.missing {
   background: color-mix(in srgb, #d97706 14%, transparent);
+}
+
+.shortcut-link {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 5px 8px;
+  border-radius: 5px;
+  color: inherit;
+  text-decoration: none;
+}
+
+.shortcut-link:hover,
+.shortcut-link:focus-visible {
+  background: color-mix(in srgb, CanvasText 10%, transparent);
+  outline: none;
+}
+
+.shortcut-link code {
+  color: LinkText;
+  text-decoration: underline;
+  text-underline-offset: 2px;
 }
 
 select {

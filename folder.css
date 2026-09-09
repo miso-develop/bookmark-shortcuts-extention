@@ -13,6 +13,10 @@ body {
   color: CanvasText;
 }
 
+body.browser-chrome {
+  font-size: 15px;
+}
+
 body.full-page {
   width: 100%;
   min-height: 100vh;
@@ -134,12 +138,13 @@ main {
   display: flex;
   width: 100%;
   align-items: center;
-  gap: 8px;
-  padding: 7px 8px;
+  gap: 7px;
+  padding: 5px 8px;
   border: 0;
   border-radius: 6px;
   background: transparent;
   cursor: pointer;
+  line-height: 1.15;
   text-align: left;
 }
 
@@ -188,5 +193,5 @@ main {
 hr {
   border: 0;
   border-top: 1px solid color-mix(in srgb, CanvasText 16%, transparent);
-  margin: 5px 8px;
+  margin: 4px 8px;
 }

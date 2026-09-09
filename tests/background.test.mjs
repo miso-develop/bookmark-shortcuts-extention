@@ -22,6 +22,7 @@ function createHarness({
   chromeBars = null
 } = {}) {
   let commandListener;
+  let messageListener;
   const calls = {
     getTree: 0,
     getChildren: [],
@@ -77,6 +78,7 @@ function createHarness({
   }
 
   const runtime = {
+    onMessage: { addListener(fn) { messageListener = fn; } },
     getURL(path) {
       calls.getURL.push(path);
       return `${kind === "chrome" ? "chrome" : "moz"}-extension://test/${path}`;
@@ -123,7 +125,11 @@ function createHarness({
 
   return {
     calls,
-    run(command) { return commandListener(command); }
+    run(command) { return commandListener(command); },
+    sendMessage(message) {
+      assert.equal(typeof messageListener, "function");
+      return messageListener(message);
+    }
   };
 }
 
@@ -154,6 +160,16 @@ test("selects the syncing Chrome bookmarks bar by default when multiple bars exi
   assert.equal(harness.calls.getTree, 1);
   assert.deepEqual(harness.calls.getChildren, ["account"]);
   assert.deepEqual(harness.calls.update, [[17, { url: "https://account.example" }]]);
+});
+
+test("opens Chrome shortcut settings from an options-page message", async () => {
+  const harness = createHarness({ kind: "chrome" });
+  const response = await harness.sendMessage({ type: "open-chrome-shortcuts" });
+
+  assert.deepEqual(response, { ok: true });
+  assert.deepEqual(harness.calls.create, [
+    { url: "chrome://extensions/shortcuts" }
+  ]);
 });
 
 test("recognizes a Chrome folder without Firefox's type property", async () => {

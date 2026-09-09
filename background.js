@@ -29,6 +29,19 @@ if (!extensionApi || !platform) {
   throw new Error("Bookmark Shortcuts platform initialization failed.");
 }
 
+if (platform.isChrome && extensionApi.runtime?.onMessage?.addListener) {
+  extensionApi.runtime.onMessage.addListener((message) => {
+    if (message?.type !== "open-chrome-shortcuts") return undefined;
+
+    return extensionApi.tabs.create({ url: "chrome://extensions/shortcuts" })
+      .then(() => ({ ok: true }))
+      .catch((error) => {
+        console.error("Failed to open Chrome shortcut settings:", error);
+        return { ok: false, error: String(error) };
+      });
+  });
+}
+
 extensionApi.commands.onCommand.addListener(async (command) => {
   try {
     const match = COMMAND_PATTERN.exec(command);

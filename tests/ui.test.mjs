@@ -11,6 +11,7 @@ const folderJs = readFileSync(resolve(root, "folder.js"), "utf8");
 const settingsButtonJs = readFileSync(resolve(root, "settings-button.js"), "utf8");
 const optionsHtml = readFileSync(resolve(root, "options.html"), "utf8");
 const optionsJs = readFileSync(resolve(root, "options.js"), "utf8");
+const optionsCss = readFileSync(resolve(root, "options.css"), "utf8");
 
 test("keeps settings out of the folder popup and in the options page", () => {
   assert.equal(folderHtml.includes('id="always-new-tab"'), false);
@@ -78,6 +79,13 @@ test("opens extension settings from a gear button in the popup header", () => {
   assert.ok(folderIndex > settingsIndex);
 });
 
+test("uses a larger Chrome popup font while keeping rows compact in both browsers", () => {
+  assert.equal(settingsButtonJs.includes('classList.toggle("browser-chrome"'), true);
+  assert.equal(folderCss.includes("body.browser-chrome {\n  font-size: 15px;"), true);
+  assert.equal(folderCss.includes("padding: 5px 8px;"), true);
+  assert.equal(folderCss.includes("line-height: 1.15;"), true);
+});
+
 test("shows root toolbar position and supports Chrome favicon rendering", () => {
   assert.equal(folderHtml.includes('id="root-position"'), true);
   assert.equal(folderCss.includes(".root-position"), true);
@@ -85,13 +93,18 @@ test("shows root toolbar position and supports Chrome favicon rendering", () => 
   assert.equal(folderJs.includes("platform.getFaviconUrl?.(item.url, 16)"), true);
 });
 
-test("Chrome options expose shortcut diagnostics and bookmark source selection", () => {
+test("Chrome options expose shortcut diagnostics and clickable shortcut settings links", () => {
   assert.equal(optionsHtml.includes('id="chrome-settings"'), true);
   assert.equal(optionsHtml.includes('id="shortcut-summary"'), true);
+  assert.equal(optionsHtml.includes('class="chrome-shortcuts-link"'), true);
   assert.equal(optionsHtml.includes('chrome://extensions/shortcuts'), true);
   assert.equal(optionsHtml.includes('id="bookmark-source"'), true);
   assert.equal(optionsJs.includes("extensionApi.commands.getAll()"), true);
+  assert.equal(optionsJs.includes('type: "open-chrome-shortcuts"'), true);
+  assert.equal(optionsJs.includes('className = "shortcut-link chrome-shortcuts-link"'), true);
   assert.equal(optionsJs.includes("platform.setBookmarkBarPreference"), true);
+  assert.equal(optionsCss.includes(".chrome-shortcuts-link"), true);
+  assert.equal(optionsCss.includes(".shortcut-link"), true);
 });
 
 test("defines a full-page layout for folder views opened in a tab", () => {

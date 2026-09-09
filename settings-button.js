@@ -3,6 +3,8 @@
   const extensionApi = platform?.api ?? globalThis.browser ?? globalThis.chrome ?? null;
   const settingsButton = document.getElementById("settings");
 
+  document.body.classList.toggle("browser-chrome", Boolean(platform?.isChrome));
+
   if (!settingsButton || !extensionApi?.runtime?.openOptionsPage) return;
 
   let opening = false;

@@ -36,6 +36,28 @@ function commandLabel(name) {
     : `Bookmark ${position}`;
 }
 
+async function openChromeShortcutSettings() {
+  try {
+    const response = await extensionApi.runtime.sendMessage({
+      type: "open-chrome-shortcuts"
+    });
+    if (response?.ok === false) {
+      throw new Error(response.error || "Failed to open shortcut settings.");
+    }
+  } catch (error) {
+    console.error("Failed to open Chrome shortcut settings:", error);
+    showStatus("Chromeのショートカット設定を開けませんでした。");
+  }
+}
+
+chromeSettings.addEventListener("click", (event) => {
+  const link = event.target.closest?.(".chrome-shortcuts-link");
+  if (!link) return;
+
+  event.preventDefault();
+  void openChromeShortcutSettings();
+});
+
 async function renderChromeShortcutStatus() {
   const commands = (await extensionApi.commands.getAll())
     .filter((command) => COMMAND_PATTERN.test(command.name ?? ""))
@@ -56,13 +78,19 @@ async function renderChromeShortcutStatus() {
     const item = document.createElement("li");
     item.className = command.shortcut ? "configured" : "missing";
 
+    const link = document.createElement("a");
+    link.className = "shortcut-link chrome-shortcuts-link";
+    link.href = "#";
+    link.setAttribute("aria-label", `${commandLabel(command.name)}: ${command.shortcut || "Not configured"}. Change shortcut`);
+
     const label = document.createElement("span");
     label.textContent = commandLabel(command.name);
 
     const shortcut = document.createElement("code");
     shortcut.textContent = command.shortcut || "Not configured";
 
-    item.append(label, shortcut);
+    link.append(label, shortcut);
+    item.append(link);
     shortcutList.append(item);
   }
 }
