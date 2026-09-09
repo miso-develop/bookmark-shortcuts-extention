@@ -65,7 +65,7 @@ test("loads the shared platform adapter before the folder module", () => {
   assert.ok(folderIndex > platformIndex);
 });
 
-test("opens Firefox settings directly in a tab and Chrome settings through the background", () => {
+test("opens Firefox settings in a popup window and Chrome settings through the background", () => {
   assert.equal(folderHtml.includes('id="settings"'), true);
   assert.equal(folderHtml.includes('class="settings-icon"'), true);
   assert.equal(folderHtml.includes('<svg class="settings-icon"'), true);
@@ -75,6 +75,10 @@ test("opens Firefox settings directly in a tab and Chrome settings through the b
   assert.equal(settingsButtonJs.includes("platform?.isChrome"), true);
   assert.equal(settingsButtonJs.includes('type: "open-options-page"'), true);
   assert.equal(settingsButtonJs.includes('runtime.getURL("options.html")'), true);
+  assert.equal(settingsButtonJs.includes("extensionApi.windows.create({"), true);
+  assert.equal(settingsButtonJs.includes('type: "popup"'), true);
+  assert.equal(settingsButtonJs.includes("width: 640"), true);
+  assert.equal(settingsButtonJs.includes("height: 560"), true);
   assert.equal(settingsButtonJs.includes("extensionApi.tabs.create({ url: optionsUrl })"), true);
   assert.equal(settingsButtonJs.includes("runtime.openOptionsPage()"), false);
   assert.equal(settingsButtonJs.includes('event.key !== "Enter" && event.key !== " "'), true);

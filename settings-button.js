@@ -23,10 +23,17 @@
         }
       } else {
         const optionsUrl = extensionApi.runtime.getURL("options.html");
-        if (typeof extensionApi.tabs?.create === "function") {
+        if (typeof extensionApi.windows?.create === "function") {
+          await extensionApi.windows.create({
+            url: optionsUrl,
+            type: "popup",
+            width: 640,
+            height: 560
+          });
+        } else if (typeof extensionApi.tabs?.create === "function") {
           await extensionApi.tabs.create({ url: optionsUrl });
         } else {
-          window.open(optionsUrl, "_blank", "noopener");
+          window.open(optionsUrl, "_blank", "noopener,width=640,height=560");
         }
       }
 
