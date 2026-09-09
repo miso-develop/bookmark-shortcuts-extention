@@ -166,7 +166,7 @@ test("opens Chrome shortcut settings from an options-page message", async () => 
   const harness = createHarness({ kind: "chrome" });
   const response = await harness.sendMessage({ type: "open-chrome-shortcuts" });
 
-  assert.deepEqual(response, { ok: true });
+  assert.deepEqual(plain(response), { ok: true });
   assert.deepEqual(harness.calls.create, [
     { url: "chrome://extensions/shortcuts" }
   ]);
