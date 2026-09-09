@@ -10,6 +10,7 @@
   <body>
     <header class="header">
       <button id="up" class="up" type="button" aria-label="親フォルダへ" hidden>←</button>
+      <div id="root-position" class="root-position" hidden></div>
       <div class="heading">
         <div id="folder-title" class="folder-title">Bookmark Shortcuts</div>
         <div id="folder-subtitle" class="folder-subtitle">Alt+数字でブックマークを開きます</div>
@@ -21,6 +22,7 @@
       <div id="items" class="items" hidden></div>
     </main>
 
+    <script src="platform.js"></script>
     <script type="module" src="folder.js"></script>
   </body>
 </html>

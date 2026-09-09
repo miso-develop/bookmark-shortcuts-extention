@@ -3,9 +3,25 @@ import { parsePopupShortcut } from "./popup-shortcuts.js";
 const ALWAYS_NEW_TAB_KEY = "always-new-tab";
 const FIXED_ARROW_JUMP = 5;
 
+const fallbackGetNodeType = (node) => {
+  if (!node) return "unknown";
+  if (node.type === "separator") return "separator";
+  if (node.type === "folder") return "folder";
+  if (node.type === "bookmark") return "bookmark";
+  return typeof node.url === "string" ? "bookmark" : "folder";
+};
+
+const platform = globalThis.BookmarkShortcutsPlatform ?? {
+  api: globalThis.browser ?? globalThis.chrome ?? null,
+  isChrome: Boolean(globalThis.chrome && !globalThis.browser),
+  getNodeType: fallbackGetNodeType,
+  getFaviconUrl: () => null
+};
+const extensionApi = platform.api;
+
 export async function getFolderData(bookmarksApi, folderId) {
   const [folder] = await bookmarksApi.get(folderId);
-  if (!folder || folder.type !== "folder") {
+  if (!folder || platform.getNodeType(folder) !== "folder") {
     throw new Error(`Bookmark folder not found: ${folderId}`);
   }
 
@@ -95,21 +111,46 @@ export function shouldOpenInNewTab({ ctrlKey = false, alwaysNewTab = false } = {
   return ctrlKey || alwaysNewTab;
 }
 
-export function buildFolderViewPath(folderId, { fullPage = false } = {}) {
-  const path = `folder.html?id=${encodeURIComponent(folderId)}`;
-  return fullPage ? `${path}&view=tab` : path;
+export function buildFolderViewPath(
+  folderId,
+  { fullPage = false, position = null } = {}
+) {
+  const params = new URLSearchParams({ id: folderId });
+  if (Number.isInteger(position) && position > 0) {
+    params.set("position", String(position));
+  }
+  if (fullPage) {
+    params.set("view", "tab");
+  }
+  return `folder.html?${params.toString()}`;
 }
 
 function createItemButton(item) {
+  const itemType = platform.getNodeType(item);
   const button = document.createElement("button");
   button.type = "button";
   button.className = "item";
-  button.dataset.itemType = item.type;
+  button.dataset.itemType = itemType;
 
   const icon = document.createElement("span");
   icon.className = "item-icon";
-  icon.textContent = item.type === "folder" ? "📁" : "🔖";
   icon.setAttribute("aria-hidden", "true");
+
+  if (itemType === "folder") {
+    icon.textContent = "📁";
+  } else {
+    const faviconUrl = platform.getFaviconUrl?.(item.url, 16);
+    if (faviconUrl) {
+      const image = document.createElement("img");
+      image.src = faviconUrl;
+      image.alt = "";
+      image.width = 16;
+      image.height = 16;
+      icon.append(image);
+    } else {
+      icon.textContent = "🔖";
+    }
+  }
 
   const label = document.createElement("span");
   label.className = "item-label";
@@ -117,7 +158,7 @@ function createItemButton(item) {
 
   button.append(icon, label);
 
-  if (item.type === "folder") {
+  if (itemType === "folder") {
     button.dataset.folderId = item.id;
     const chevron = document.createElement("span");
     chevron.className = "item-chevron";
@@ -126,7 +167,7 @@ function createItemButton(item) {
     return button;
   }
 
-  if (typeof item.url === "string") {
+  if (itemType === "bookmark" && typeof item.url === "string") {
     button.dataset.url = item.url;
     return button;
   }
@@ -135,10 +176,16 @@ function createItemButton(item) {
   return button;
 }
 
+function parsePositiveInteger(value) {
+  const parsed = Number.parseInt(value ?? "", 10);
+  return Number.isInteger(parsed) && parsed > 0 ? parsed : null;
+}
+
 async function initializeFolderView() {
   const title = document.getElementById("folder-title");
   const subtitle = document.getElementById("folder-subtitle");
   const upButton = document.getElementById("up");
+  const rootPositionElement = document.getElementById("root-position");
   const message = document.getElementById("message");
   const itemsContainer = document.getElementById("items");
   const main = document.querySelector("main");
@@ -146,10 +193,10 @@ async function initializeFolderView() {
   const params = new URLSearchParams(window.location.search);
   const initialFolderId = params.get("id");
   const fullPageView = params.get("view") === "tab";
-  const popupPort = fullPageView ? null : browser.runtime.connect({ name: "folder-popup" });
-  const shortcutProxyPort = fullPageView
-    ? null
-    : browser.runtime.connect({ name: "shortcut-proxy" });
+
+  if (!extensionApi) {
+    throw new Error("WebExtension API is unavailable.");
+  }
 
   if (fullPageView) {
     document.body.classList.add("full-page");
@@ -157,6 +204,7 @@ async function initializeFolderView() {
 
   const history = [];
   let rootFolderId = initialFolderId;
+  let rootPosition = parsePositiveInteger(params.get("position"));
   let currentFolderId = null;
   let selectableItems = [];
   let selectedIndex = -1;
@@ -196,7 +244,10 @@ async function initializeFolderView() {
   function getPageSize() {
     const selected = selectableItems[selectedIndex] || selectableItems[0];
     if (!selected) return 1;
-    const itemHeight = Math.max(1, selected.getBoundingClientRect().height || selected.offsetHeight || 1);
+    const itemHeight = Math.max(
+      1,
+      selected.getBoundingClientRect().height || selected.offsetHeight || 1
+    );
     const viewportHeight = Math.max(1, main?.clientHeight || window.innerHeight || itemHeight);
     return Math.max(1, Math.floor(viewportHeight / itemHeight));
   }
@@ -227,6 +278,24 @@ async function initializeFolderView() {
     return localStorage.getItem(ALWAYS_NEW_TAB_KEY) === "true";
   }
 
+  function updateRootPositionLabel() {
+    if (!rootPositionElement) return;
+    if (Number.isInteger(rootPosition) && rootPosition > 0) {
+      rootPositionElement.textContent = `F${rootPosition}`;
+      rootPositionElement.hidden = false;
+    } else {
+      rootPositionElement.textContent = "";
+      rootPositionElement.hidden = true;
+    }
+  }
+
+  async function updateActionPopup() {
+    if (fullPageView || !rootFolderId || !extensionApi.action?.setPopup) return;
+    await extensionApi.action.setPopup({
+      popup: buildFolderViewPath(rootFolderId, { position: rootPosition })
+    });
+  }
+
   async function activateItem(item, { forceNewTab = false } = {}) {
     if (!item) return;
 
@@ -236,7 +305,7 @@ async function initializeFolderView() {
     }
 
     if (item.dataset.url) {
-      await openBookmarkUrl(browser.tabs, item.dataset.url, {
+      await openBookmarkUrl(extensionApi.tabs, item.dataset.url, {
         forceNewTab: shouldOpenInNewTab({
           ctrlKey: forceNewTab,
           alwaysNewTab: alwaysOpenInNewTab()
@@ -253,12 +322,13 @@ async function initializeFolderView() {
     if (!folderId) return;
 
     try {
-      const { folder, items } = await getFolderData(browser.bookmarks, folderId);
+      const { folder, items } = await getFolderData(extensionApi.bookmarks, folderId);
 
       if (resetHistory) history.splice(0, history.length);
       if (pushHistory && history.at(-1) !== folder.id) history.push(folder.id);
 
       currentFolderId = folder.id;
+      updateRootPositionLabel();
       title.textContent = folder.title || "(無題のフォルダ)";
       subtitle.textContent = `${items.length} 件 · ↑↓/Shift+↑↓/PgUp/PgDn/Home/Endで選択 · Enterで開く`;
       message.hidden = true;
@@ -274,7 +344,7 @@ async function initializeFolderView() {
         refreshSelectableItems();
       } else {
         for (const item of items) {
-          if (item.type === "separator") {
+          if (platform.getNodeType(item) === "separator") {
             itemsContainer.append(document.createElement("hr"));
             continue;
           }
@@ -287,12 +357,6 @@ async function initializeFolderView() {
         }
         refreshSelectableItems({ focusFolderId });
       }
-
-      popupPort?.postMessage({
-        type: "folder-state",
-        folderId: currentFolderId,
-        rootFolderId
-      });
     } catch (error) {
       console.error("Failed to open bookmark folder:", error);
       title.textContent = "フォルダを開けませんでした";
@@ -314,16 +378,73 @@ async function initializeFolderView() {
 
   async function openFullPageView() {
     if (!currentFolderId || fullPageView) return false;
-    const path = buildFolderViewPath(currentFolderId, { fullPage: true });
-    await browser.tabs.create({ url: browser.runtime.getURL(path) });
+    const path = buildFolderViewPath(currentFolderId, {
+      fullPage: true,
+      position: rootPosition
+    });
+    await extensionApi.tabs.create({ url: extensionApi.runtime.getURL(path) });
     window.close();
     return true;
   }
 
-  function navigateAdjacentRootFolder(direction) {
-    if (fullPageView || !popupPort || history.length !== 1) return false;
-    popupPort.postMessage({ type: "navigate-adjacent-root-folder", direction });
+  async function switchRootFolder(folderId, position) {
+    if (!folderId) return false;
+    if (folderId === rootFolderId) return true;
+
+    rootFolderId = folderId;
+    rootPosition = position;
+    await updateActionPopup();
+    await render(folderId, { pushHistory: true, resetHistory: true });
     return true;
+  }
+
+  async function invokeToolbarShortcut(position, openInNewTab) {
+    const { items } = await platform.getBookmarksBarData(extensionApi.bookmarks);
+    const item = items[position - 1];
+    if (!item) return false;
+
+    const itemType = platform.getNodeType(item);
+    if (itemType === "folder") {
+      return switchRootFolder(item.id, position);
+    }
+
+    if (itemType !== "bookmark" || typeof item.url !== "string") return false;
+    await openBookmarkUrl(extensionApi.tabs, item.url, { forceNewTab: openInNewTab });
+    window.close();
+    return true;
+  }
+
+  async function navigateAdjacentRootFolder(direction) {
+    if (fullPageView || history.length !== 1 || !rootFolderId) return false;
+
+    const { items } = await platform.getBookmarksBarData(extensionApi.bookmarks);
+    const currentIndex = items.findIndex(
+      (item) => platform.getNodeType(item) === "folder" && item.id === rootFolderId
+    );
+    if (currentIndex < 0) return false;
+
+    for (
+      let index = currentIndex + direction;
+      index >= 0 && index < items.length;
+      index += direction
+    ) {
+      const item = items[index];
+      if (platform.getNodeType(item) !== "folder") continue;
+      return switchRootFolder(item.id, index + 1);
+    }
+
+    return false;
+  }
+
+  async function resolveInitialRootPosition() {
+    if (!rootFolderId || rootPosition) return;
+    try {
+      const { items } = await platform.getBookmarksBarData(extensionApi.bookmarks);
+      const index = items.findIndex((item) => item.id === rootFolderId);
+      if (index >= 0) rootPosition = index + 1;
+    } catch (error) {
+      console.error("Failed to resolve bookmark toolbar position:", error);
+    }
   }
 
   upButton.addEventListener("click", () => {
@@ -365,12 +486,11 @@ async function initializeFolderView() {
       return;
     }
 
-    if (popupShortcut && shortcutProxyPort) {
-      shortcutProxyPort.postMessage({
-        type: "invoke-toolbar-shortcut",
-        position: popupShortcut.position,
-        openInNewTab: popupShortcut.openInNewTab
-      });
+    if (popupShortcut) {
+      await invokeToolbarShortcut(
+        popupShortcut.position,
+        popupShortcut.openInNewTab
+      );
       return;
     }
 
@@ -384,14 +504,12 @@ async function initializeFolderView() {
     }
 
     if (action === "left") {
-      if (history.length === 1) {
-        navigateAdjacentRootFolder(-1);
-      }
+      await navigateAdjacentRootFolder(-1);
       return;
     }
 
     if (action === "right") {
-      navigateAdjacentRootFolder(1);
+      await navigateAdjacentRootFolder(1);
       return;
     }
 
@@ -439,24 +557,17 @@ async function initializeFolderView() {
     }
   }, true);
 
-  popupPort?.onMessage.addListener((message) => {
-    if (message?.type !== "switch-folder" || typeof message.folderId !== "string") return;
-
-    const nextRootFolderId =
-      typeof message.rootFolderId === "string" ? message.rootFolderId : message.folderId;
-
-    if (message.folderId === currentFolderId && nextRootFolderId === rootFolderId) return;
-
-    rootFolderId = nextRootFolderId;
-    render(message.folderId, { pushHistory: true, resetHistory: true });
-  });
-
   if (initialFolderId) {
+    await resolveInitialRootPosition();
     await render(initialFolderId, { pushHistory: true });
   }
 }
 
-if (typeof window !== "undefined" && typeof document !== "undefined" && typeof browser !== "undefined") {
+if (
+  typeof window !== "undefined" &&
+  typeof document !== "undefined" &&
+  extensionApi
+) {
   initializeFolderView().catch((error) => {
     console.error("Failed to initialize bookmark folder view:", error);
   });

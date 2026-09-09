@@ -6,23 +6,16 @@ import { fileURLToPath } from "node:url";
 import vm from "node:vm";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
+const platformSource = readFileSync(resolve(root, "platform.js"), "utf8");
 const backgroundSource = readFileSync(resolve(root, "background.js"), "utf8");
 
 function plain(value) {
   return JSON.parse(JSON.stringify(value));
 }
 
-function createHarness({ commands = [] } = {}) {
-  let connectListener;
+function createFirefoxHarness({ commands = [] } = {}) {
   let commandListener;
-  const calls = {
-    updates: [],
-    getChildren: [],
-    tabUpdates: [],
-    tabCreates: [],
-    errors: []
-  };
-
+  const calls = { updates: [], errors: [] };
   const browser = {
     commands: {
       onCommand: { addListener(fn) { commandListener = fn; } },
@@ -30,24 +23,14 @@ function createHarness({ commands = [] } = {}) {
       async update(value) { calls.updates.push(plain(value)); }
     },
     runtime: {
-      onConnect: { addListener(fn) { connectListener = fn; } },
+      async getBrowserInfo() { return { name: "Firefox" }; },
       getURL(path) { return `moz-extension://test/${path}`; }
     },
-    bookmarks: {
-      async getChildren(id) {
-        calls.getChildren.push(id);
-        return [{
-          id: "bookmark-1",
-          type: "bookmark",
-          title: "Example",
-          url: "https://example.com"
-        }];
-      }
-    },
+    bookmarks: { async getChildren() { return []; } },
     tabs: {
-      async query() { return [{ id: 7, pinned: false }]; },
-      async update(...args) { calls.tabUpdates.push(plain(args)); },
-      async create(options) { calls.tabCreates.push(plain(options)); }
+      async query() { return []; },
+      async update() {},
+      async create() {}
     },
     action: {
       async setBadgeText() {},
@@ -57,37 +40,28 @@ function createHarness({ commands = [] } = {}) {
     }
   };
 
-  vm.runInContext(backgroundSource, vm.createContext({
+  const context = vm.createContext({
     browser,
     Date,
+    URL,
+    URLSearchParams,
     setTimeout() { return 1; },
     console: { error(...args) { calls.errors.push(args.map(String)); } }
-  }), { filename: "background.js" });
+  });
+  vm.runInContext(platformSource, context, { filename: "platform.js" });
+  vm.runInContext(backgroundSource, context, { filename: "background.js" });
 
   return {
     calls,
+    commandListener,
     async settle() {
       await new Promise((resolve) => setTimeout(resolve, 0));
-    },
-    connectShortcutProxy() {
-      let messageListener;
-      const port = {
-        name: "shortcut-proxy",
-        onMessage: { addListener(fn) { messageListener = fn; } },
-        onDisconnect: { addListener() {} },
-        postMessage() {}
-      };
-      connectListener(port);
-      return {
-        send(message) { return messageListener(message); }
-      };
-    },
-    runCommand(command) { return commandListener(command); }
+    }
   };
 }
 
-test("restores only missing default shortcuts and preserves existing assignments", async () => {
-  const harness = createHarness({
+test("Firefox restores only missing default shortcuts and preserves existing assignments", async () => {
+  const harness = createFirefoxHarness({
     commands: [
       { name: "open-bookmark-1", shortcut: "" },
       { name: "open-bookmark-2", shortcut: "Alt+8" },
@@ -101,35 +75,5 @@ test("restores only missing default shortcuts and preserves existing assignments
     { name: "open-bookmark-1", shortcut: "Alt+1" },
     { name: "open-bookmark-new-10", shortcut: "Alt+Shift+0" }
   ]);
-});
-
-test("executes Alt+number requests sent directly from an open popup", async () => {
-  const harness = createHarness();
-  await harness.settle();
-  const proxy = harness.connectShortcutProxy();
-
-  await proxy.send({
-    type: "invoke-toolbar-shortcut",
-    position: 1,
-    openInNewTab: false
-  });
-
-  assert.deepEqual(harness.calls.getChildren, ["toolbar_____"]);
-  assert.deepEqual(harness.calls.tabUpdates, [[7, { url: "https://example.com" }]]);
-  assert.deepEqual(harness.calls.tabCreates, []);
-});
-
-test("executes Alt+Shift+number popup requests in a new tab", async () => {
-  const harness = createHarness();
-  await harness.settle();
-  const proxy = harness.connectShortcutProxy();
-
-  await proxy.send({
-    type: "invoke-toolbar-shortcut",
-    position: 1,
-    openInNewTab: true
-  });
-
-  assert.deepEqual(harness.calls.tabUpdates, []);
-  assert.deepEqual(harness.calls.tabCreates, [{ url: "https://example.com" }]);
+  assert.equal(typeof harness.commandListener, "function");
 });

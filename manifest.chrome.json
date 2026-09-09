@@ -1,0 +1,54 @@
+{
+  "manifest_version": 3,
+  "name": "Bookmark Shortcuts Minimal",
+  "version": "2.0.0",
+  "minimum_chrome_version": "134",
+  "description": "Open bookmarks bar items and folders with Alt+1 through Alt+0.",
+  "permissions": [
+    "bookmarks",
+    "favicon"
+  ],
+  "icons": {
+    "16": "icons/bookmark-shortcuts-16.png",
+    "32": "icons/bookmark-shortcuts-32.png",
+    "48": "icons/bookmark-shortcuts-48.png",
+    "128": "icons/bookmark-shortcuts-128.png"
+  },
+  "background": {
+    "service_worker": "background.js"
+  },
+  "action": {
+    "default_title": "Bookmark Shortcuts",
+    "default_icon": {
+      "16": "icons/bookmark-shortcuts-16.png",
+      "32": "icons/bookmark-shortcuts-32.png"
+    },
+    "default_popup": "folder.html"
+  },
+  "options_ui": {
+    "page": "options.html",
+    "open_in_tab": false
+  },
+  "commands": {
+    "open-bookmark-1": { "suggested_key": { "default": "Alt+1" }, "description": "Open bookmark bar item 1" },
+    "open-bookmark-2": { "suggested_key": { "default": "Alt+2" }, "description": "Open bookmark bar item 2" },
+    "open-bookmark-3": { "suggested_key": { "default": "Alt+3" }, "description": "Open bookmark bar item 3" },
+    "open-bookmark-4": { "suggested_key": { "default": "Alt+4" }, "description": "Open bookmark bar item 4" },
+    "open-bookmark-5": { "description": "Open bookmark bar item 5" },
+    "open-bookmark-6": { "description": "Open bookmark bar item 6" },
+    "open-bookmark-7": { "description": "Open bookmark bar item 7" },
+    "open-bookmark-8": { "description": "Open bookmark bar item 8" },
+    "open-bookmark-9": { "description": "Open bookmark bar item 9" },
+    "open-bookmark-10": { "description": "Open bookmark bar item 10" },
+    "open-bookmark-new-1": { "description": "Open bookmark bar item 1 in a new tab" },
+    "open-bookmark-new-2": { "description": "Open bookmark bar item 2 in a new tab" },
+    "open-bookmark-new-3": { "description": "Open bookmark bar item 3 in a new tab" },
+    "open-bookmark-new-4": { "description": "Open bookmark bar item 4 in a new tab" },
+    "open-bookmark-new-5": { "description": "Open bookmark bar item 5 in a new tab" },
+    "open-bookmark-new-6": { "description": "Open bookmark bar item 6 in a new tab" },
+    "open-bookmark-new-7": { "description": "Open bookmark bar item 7 in a new tab" },
+    "open-bookmark-new-8": { "description": "Open bookmark bar item 8 in a new tab" },
+    "open-bookmark-new-9": { "description": "Open bookmark bar item 9 in a new tab" },
+    "open-bookmark-new-10": { "description": "Open bookmark bar item 10 in a new tab" }
+  }
+}

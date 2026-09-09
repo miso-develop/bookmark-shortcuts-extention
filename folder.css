@@ -35,6 +35,17 @@ body.full-page {
   background: Canvas;
 }
 
+.root-position {
+  flex: 0 0 auto;
+  min-width: 24px;
+  padding: 3px 6px;
+  border-radius: 999px;
+  background: color-mix(in srgb, CanvasText 12%, transparent);
+  font-size: 0.78em;
+  font-weight: 700;
+  text-align: center;
+}
+
 .heading {
   min-width: 0;
   flex: 1;
@@ -132,9 +143,18 @@ main {
 }
 
 .item-icon {
+  display: grid;
   width: 20px;
+  height: 20px;
   flex: 0 0 20px;
+  place-items: center;
   text-align: center;
+}
+
+.item-icon img {
+  display: block;
+  width: 16px;
+  height: 16px;
 }
 
 .item-label {

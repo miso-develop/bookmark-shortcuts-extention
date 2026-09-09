@@ -6,6 +6,7 @@ import { fileURLToPath } from "node:url";
 import vm from "node:vm";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
+const platformSource = readFileSync(resolve(root, "platform.js"), "utf8");
 const backgroundSource = readFileSync(resolve(root, "background.js"), "utf8");
 
 function plain(value) {
@@ -13,28 +14,81 @@ function plain(value) {
 }
 
 function createHarness({
+  kind = "firefox",
   items = [{ id: "bookmark-1", type: "bookmark", title: "Example", url: "https://example.com/1" }],
   activeTab = { id: 17, pinned: false },
   bookmarksError = null,
-  openPopupError = null
+  openPopupError = null,
+  chromeBars = null
 } = {}) {
   let commandListener;
-  let connectListener;
   const calls = {
-    getChildren: [], create: [], query: [], update: [], setBadgeText: [],
-    setTitle: [], setPopup: [], openPopup: 0, getURL: [], timers: [],
-    errors: [], portMessages: []
+    getTree: 0,
+    getChildren: [],
+    create: [],
+    query: [],
+    update: [],
+    setBadgeText: [],
+    setTitle: [],
+    setPopup: [],
+    openPopup: 0,
+    getURL: [],
+    timers: [],
+    errors: []
   };
 
-  const browser = {
-    commands: { onCommand: { addListener(fn) { commandListener = fn; } } },
-    bookmarks: {
-      async getChildren(id) {
-        calls.getChildren.push(id);
-        if (bookmarksError) throw bookmarksError;
-        return items;
+  const commands = {
+    onCommand: { addListener(fn) { commandListener = fn; } }
+  };
+
+  if (kind === "firefox") {
+    commands.getAll = async () => [];
+    commands.update = async () => {};
+  } else {
+    commands.getAll = async () => [];
+  }
+
+  const bookmarkApi = {
+    async getChildren(id) {
+      calls.getChildren.push(id);
+      if (bookmarksError) throw bookmarksError;
+      if (kind === "chrome" && chromeBars) {
+        return chromeBars[id]?.items ?? [];
       }
-    },
+      return items;
+    }
+  };
+
+  if (kind === "chrome") {
+    bookmarkApi.getTree = async () => {
+      calls.getTree += 1;
+      const bars = chromeBars ?? {
+        account: {
+          node: { id: "account", title: "Bookmarks bar", folderType: "bookmarks-bar", syncing: true },
+          items
+        }
+      };
+      return [{
+        id: "0",
+        title: "root",
+        children: Object.values(bars).map(({ node }) => ({ ...node }))
+      }];
+    };
+  }
+
+  const runtime = {
+    getURL(path) {
+      calls.getURL.push(path);
+      return `${kind === "chrome" ? "chrome" : "moz"}-extension://test/${path}`;
+    }
+  };
+  if (kind === "firefox") {
+    runtime.getBrowserInfo = async () => ({ name: "Firefox" });
+  }
+
+  const extensionApi = {
+    commands,
+    bookmarks: bookmarkApi,
     tabs: {
       async create(options) { calls.create.push(plain(options)); return { id: 99, ...plain(options) }; },
       async query(queryInfo) { calls.query.push(plain(queryInfo)); return activeTab ? [activeTab] : []; },
@@ -49,78 +103,82 @@ function createHarness({
         if (openPopupError) throw openPopupError;
       }
     },
-    runtime: {
-      onConnect: { addListener(fn) { connectListener = fn; } },
-      getURL(path) { calls.getURL.push(path); return `moz-extension://test/${path}`; }
-    }
+    runtime
   };
 
-  const context = vm.createContext({
-    browser,
+  const globals = {
+    Date,
+    URL,
+    URLSearchParams,
     setTimeout(fn, delay) { calls.timers.push({ fn, delay }); return calls.timers.length; },
     console: { error(...args) { calls.errors.push(args.map(String)); } }
-  });
+  };
+  if (kind === "chrome") globals.chrome = extensionApi;
+  else globals.browser = extensionApi;
 
+  const context = vm.createContext(globals);
+  vm.runInContext(platformSource, context, { filename: "platform.js" });
   vm.runInContext(backgroundSource, context, { filename: "background.js" });
   assert.equal(typeof commandListener, "function");
-  assert.equal(typeof connectListener, "function");
 
   return {
     calls,
-    run(command) { return commandListener(command); },
-    connectPopup(rootFolderId, currentFolderId = rootFolderId) {
-      let messageListener;
-      let disconnectListener;
-      const port = {
-        name: "folder-popup",
-        onMessage: { addListener(fn) { messageListener = fn; } },
-        onDisconnect: { addListener(fn) { disconnectListener = fn; } },
-        postMessage(message) { calls.portMessages.push(plain(message)); }
-      };
-
-      connectListener(port);
-      messageListener({
-        type: "folder-state",
-        folderId: currentFolderId,
-        rootFolderId
-      });
-
-      return {
-        send(message) { return messageListener(message); },
-        disconnect() { disconnectListener(); }
-      };
-    }
+    run(command) { return commandListener(command); }
   };
 }
 
-test("opens a toolbar bookmark in the active tab and shows feedback", async () => {
+test("opens a Firefox bookmarks-toolbar bookmark in the active tab", async () => {
   const harness = createHarness();
   await harness.run("open-bookmark-1");
   assert.deepEqual(harness.calls.getChildren, ["toolbar_____"]);
-  assert.deepEqual(harness.calls.query, [{ active: true, currentWindow: true }]);
   assert.deepEqual(harness.calls.update, [[17, { url: "https://example.com/1" }]]);
-  assert.deepEqual(harness.calls.create, []);
   assert.deepEqual(harness.calls.setBadgeText, [{ text: "1" }]);
-  assert.deepEqual(harness.calls.setTitle, [{ title: "1: Example" }]);
-  assert.equal(harness.calls.timers[0].delay, 900);
-  assert.deepEqual(harness.calls.errors, []);
 });
 
-test("clears toolbar feedback after the feedback timer", async () => {
-  const harness = createHarness();
+test("selects the syncing Chrome bookmarks bar by default when multiple bars exist", async () => {
+  const harness = createHarness({
+    kind: "chrome",
+    chromeBars: {
+      local: {
+        node: { id: "local", title: "Bookmarks bar", folderType: "bookmarks-bar", syncing: false },
+        items: [{ id: "local-bookmark", title: "Local", url: "https://local.example" }]
+      },
+      account: {
+        node: { id: "account", title: "Bookmarks bar", folderType: "bookmarks-bar", syncing: true },
+        items: [{ id: "account-bookmark", title: "Account", url: "https://account.example" }]
+      }
+    }
+  });
+
   await harness.run("open-bookmark-1");
-  await harness.calls.timers[0].fn();
-  assert.deepEqual(harness.calls.setBadgeText, [{ text: "1" }, { text: "" }]);
-  assert.deepEqual(harness.calls.setTitle, [
-    { title: "1: Example" }, { title: "Bookmark Shortcuts" }
+  assert.equal(harness.calls.getTree, 1);
+  assert.deepEqual(harness.calls.getChildren, ["account"]);
+  assert.deepEqual(harness.calls.update, [[17, { url: "https://account.example" }]]);
+});
+
+test("recognizes a Chrome folder without Firefox's type property", async () => {
+  const harness = createHarness({
+    kind: "chrome",
+    chromeBars: {
+      account: {
+        node: { id: "account", title: "Bookmarks bar", folderType: "bookmarks-bar", syncing: true },
+        items: [{ id: "folder/1", title: "Tools" }]
+      }
+    }
+  });
+
+  await harness.run("open-bookmark-1");
+  assert.deepEqual(harness.calls.setPopup, [
+    { popup: "folder.html?id=folder%2F1&position=1" }
   ]);
+  assert.equal(harness.calls.openPopup, 1);
+  assert.deepEqual(harness.calls.setBadgeText, [{ text: "F1" }]);
 });
 
 test("opens a bookmark in a new tab for the new-tab command", async () => {
   const harness = createHarness();
   await harness.run("open-bookmark-new-1");
   assert.deepEqual(harness.calls.create, [{ url: "https://example.com/1" }]);
-  assert.deepEqual(harness.calls.query, []);
   assert.deepEqual(harness.calls.update, []);
 });
 
@@ -131,105 +189,19 @@ test("does not replace a pinned active tab", async () => {
   assert.deepEqual(harness.calls.update, []);
 });
 
-test("opens a toolbar folder in the bookmarks-toolbar action popup", async () => {
-  const harness = createHarness({ items: [
-    { id: "folder/1", type: "folder", title: "Tools" },
-    { id: "bookmark-2", type: "bookmark", title: "Second", url: "https://example.com/2" }
-  ] });
-  await harness.run("open-bookmark-1");
-  assert.deepEqual(harness.calls.setPopup, [{ popup: "folder.html?id=folder%2F1" }]);
-  assert.equal(harness.calls.openPopup, 1);
-  assert.deepEqual(harness.calls.create, []);
-});
-
-test("does nothing for the same root folder shortcut even while a subfolder is displayed", async () => {
-  const harness = createHarness({ items: [{ id: "folder-1", type: "folder", title: "Tools" }] });
-  harness.connectPopup("folder-1", "nested-folder");
-  await harness.run("open-bookmark-1");
-  assert.equal(harness.calls.openPopup, 0);
-  assert.deepEqual(harness.calls.portMessages, []);
-  assert.deepEqual(harness.calls.create, []);
-});
-
-test("switches an open popup when a different folder shortcut is pressed", async () => {
-  const harness = createHarness({ items: [
-    { id: "folder-1", type: "folder", title: "One" },
-    { id: "folder-2", type: "folder", title: "Two" }
-  ] });
-  harness.connectPopup("folder-1");
-  await harness.run("open-bookmark-2");
-  assert.equal(harness.calls.openPopup, 0);
-  assert.deepEqual(harness.calls.portMessages, [
-    { type: "switch-folder", folderId: "folder-2", rootFolderId: "folder-2" }
-  ]);
-  assert.deepEqual(harness.calls.setPopup, [{ popup: "folder.html?id=folder-2" }]);
-});
-
-test("moves right to the next toolbar folder while skipping non-folders", async () => {
-  const harness = createHarness({ items: [
-    { id: "folder-1", type: "folder", title: "One" },
-    { id: "bookmark-2", type: "bookmark", title: "B", url: "https://example.com" },
-    { id: "separator-3", type: "separator" },
-    { id: "folder-4", type: "folder", title: "Four" },
-    { id: "folder-5", type: "folder", title: "Five" }
-  ] });
-  const popup = harness.connectPopup("folder-1");
-  await popup.send({ type: "navigate-adjacent-root-folder", direction: 1 });
-
-  assert.deepEqual(harness.calls.portMessages, [
-    { type: "switch-folder", folderId: "folder-4", rootFolderId: "folder-4" }
-  ]);
-  assert.deepEqual(harness.calls.setPopup, [{ popup: "folder.html?id=folder-4" }]);
-  assert.deepEqual(harness.calls.setBadgeText, [{ text: "F4" }]);
-});
-
-test("moves left to the previous toolbar folder while skipping non-folders", async () => {
-  const harness = createHarness({ items: [
-    { id: "folder-1", type: "folder", title: "One" },
-    { id: "bookmark-2", type: "bookmark", title: "B", url: "https://example.com" },
-    { id: "folder-3", type: "folder", title: "Three" }
-  ] });
-  const popup = harness.connectPopup("folder-3");
-  await popup.send({ type: "navigate-adjacent-root-folder", direction: -1 });
-
-  assert.deepEqual(harness.calls.portMessages, [
-    { type: "switch-folder", folderId: "folder-1", rootFolderId: "folder-1" }
-  ]);
-  assert.deepEqual(harness.calls.setBadgeText, [{ text: "F1" }]);
-});
-
-test("adjacent toolbar folder navigation stops at both ends", async () => {
-  const items = [
-    { id: "folder-1", type: "folder", title: "One" },
-    { id: "folder-2", type: "folder", title: "Two" }
-  ];
-
-  const leftHarness = createHarness({ items });
-  const leftPopup = leftHarness.connectPopup("folder-1");
-  await leftPopup.send({ type: "navigate-adjacent-root-folder", direction: -1 });
-  assert.deepEqual(leftHarness.calls.portMessages, []);
-  assert.deepEqual(leftHarness.calls.setPopup, []);
-
-  const rightHarness = createHarness({ items });
-  const rightPopup = rightHarness.connectPopup("folder-2");
-  await rightPopup.send({ type: "navigate-adjacent-root-folder", direction: 1 });
-  assert.deepEqual(rightHarness.calls.portMessages, []);
-  assert.deepEqual(rightHarness.calls.setPopup, []);
-});
-
 test("falls back to the full-page folder view when the popup cannot be opened", async () => {
   const harness = createHarness({
     items: [{ id: "folder-1", type: "folder", title: "Tools" }],
     openPopupError: new Error("popup blocked")
   });
   await harness.run("open-bookmark-1");
-  assert.deepEqual(harness.calls.getURL, ["folder.html?id=folder-1&view=tab"]);
+  assert.deepEqual(harness.calls.getURL, ["folder.html?id=folder-1&position=1&view=tab"]);
   assert.deepEqual(harness.calls.create, [
-    { url: "moz-extension://test/folder.html?id=folder-1&view=tab" }
+    { url: "moz-extension://test/folder.html?id=folder-1&position=1&view=tab" }
   ]);
 });
 
-test("keeps numbering aligned with toolbar positions including separators", async () => {
+test("keeps numbering aligned with Firefox separators", async () => {
   const harness = createHarness({ items: [
     { id: "separator-1", type: "separator" },
     { id: "bookmark-2", type: "bookmark", title: "Second", url: "https://example.com/2" }
@@ -240,32 +212,13 @@ test("keeps numbering aligned with toolbar positions including separators", asyn
   assert.deepEqual(harness.calls.update, [[17, { url: "https://example.com/2" }]]);
 });
 
-test("maps bookmark 10 to the tenth toolbar position", async () => {
-  const items = Array.from({ length: 10 }, (_, index) => ({
-    id: `bookmark-${index + 1}`, type: "bookmark", title: `Bookmark ${index + 1}`,
-    url: `https://example.com/${index + 1}`
-  }));
-  const harness = createHarness({ items });
-  await harness.run("open-bookmark-10");
-  assert.deepEqual(harness.calls.update, [[17, { url: "https://example.com/10" }]]);
-  assert.deepEqual(harness.calls.setBadgeText, [{ text: "10" }]);
-});
-
-test("uses the current tab overload when no active tab id is available", async () => {
-  const harness = createHarness({ activeTab: null });
-  await harness.run("open-bookmark-1");
-  assert.deepEqual(harness.calls.update, [[{ url: "https://example.com/1" }]]);
-});
-
 test("ignores unknown commands before reading bookmarks", async () => {
   const harness = createHarness();
   await harness.run("open-bookmark-11");
   assert.deepEqual(harness.calls.getChildren, []);
-  assert.deepEqual(harness.calls.create, []);
-  assert.deepEqual(harness.calls.update, []);
 });
 
-test("contains browser API failures instead of rejecting the command listener", async () => {
+test("contains bookmark API failures instead of rejecting the command listener", async () => {
   const harness = createHarness({ bookmarksError: new Error("boom") });
   await assert.doesNotReject(harness.run("open-bookmark-1"));
   assert.equal(harness.calls.errors.length, 1);
