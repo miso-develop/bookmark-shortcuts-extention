@@ -10,15 +10,45 @@
   <body>
     <main>
       <h1>Bookmark Shortcuts</h1>
-      <label class="option-row">
-        <input id="always-new-tab" type="checkbox">
-        <span>
-          <strong>Enterで常に新しいタブで開く</strong>
-          <small>OFFの場合、Enterは現在のタブ、Ctrl+Enterは新しいタブで開きます。</small>
-        </span>
-      </label>
+
+      <section class="panel">
+        <h2>基本設定</h2>
+        <label class="option-row">
+          <input id="always-new-tab" type="checkbox">
+          <span>
+            <strong>Enterで常に新しいタブで開く</strong>
+            <small>OFFの場合、Enterは現在のタブ、Ctrl+Enterは新しいタブで開きます。</small>
+          </span>
+        </label>
+      </section>
+
+      <section id="chrome-settings" class="panel" hidden>
+        <h2>Chrome</h2>
+        <p id="browser-info" class="muted"></p>
+        <p class="muted">拡張アイコンをChromeツールバーへPinしておくと、現在位置のバッジを確認しやすくなります。</p>
+
+        <div class="settings-group">
+          <h3>キーボードショートカット</h3>
+          <p id="shortcut-summary"></p>
+          <p class="muted">
+            Chromeでは既定ショートカットを最大4件しか設定できません。残りは
+            <code>chrome://extensions/shortcuts</code>
+            で一度設定してください。
+          </p>
+          <ul id="shortcut-list" class="shortcut-list"></ul>
+        </div>
+
+        <div id="bookmark-source-section" class="settings-group" hidden>
+          <h3>Bookmarks Bar</h3>
+          <label for="bookmark-source">Alt+数字の対象</label>
+          <select id="bookmark-source"></select>
+          <p class="muted">Google Account側とThis device側のBookmarks Barが両方ある場合に選択できます。</p>
+        </div>
+      </section>
+
       <p id="status" class="status" aria-live="polite"></p>
     </main>
+    <script src="platform.js"></script>
     <script type="module" src="options.js"></script>
   </body>
 </html>

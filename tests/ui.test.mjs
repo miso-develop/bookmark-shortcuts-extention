@@ -9,6 +9,7 @@ const folderHtml = readFileSync(resolve(root, "folder.html"), "utf8");
 const folderCss = readFileSync(resolve(root, "folder.css"), "utf8");
 const folderJs = readFileSync(resolve(root, "folder.js"), "utf8");
 const optionsHtml = readFileSync(resolve(root, "options.html"), "utf8");
+const optionsJs = readFileSync(resolve(root, "options.js"), "utf8");
 
 test("keeps settings out of the folder popup and in the options page", () => {
   assert.equal(folderHtml.includes('id="always-new-tab"'), false);
@@ -32,8 +33,10 @@ test("restores focus to the child folder item after navigating back", () => {
   assert.equal(folderJs.includes("findFolderSelectionIndex(selectableItems, focusFolderId)"), true);
 });
 
-test("left arrow does not navigate back from a subfolder", () => {
-  assert.equal(folderJs.includes('if (history.length === 1) {\n        navigateAdjacentRootFolder(-1);'), true);
+test("left and right arrows switch root folders only through the root-folder navigator", () => {
+  assert.equal(folderJs.includes('if (fullPageView || history.length !== 1 || !rootFolderId) return false;'), true);
+  assert.equal(folderJs.includes('await navigateAdjacentRootFolder(-1);'), true);
+  assert.equal(folderJs.includes('await navigateAdjacentRootFolder(1);'), true);
   assert.equal(folderJs.includes('if (history.length > 1) {\n        await goBack();\n      } else'), false);
 });
 
@@ -45,10 +48,35 @@ test("traps received popup shortcuts in capture phase but leaves Escape availabl
   assert.equal(folderJs.includes("}, true);"), true);
 });
 
-test("centralizes Alt-number popup shortcuts in the folder view", () => {
+test("handles Alt-number popup shortcuts directly without background popup state", () => {
   assert.equal(folderJs.includes('import { parsePopupShortcut } from "./popup-shortcuts.js";'), true);
-  assert.equal(folderJs.includes('browser.runtime.connect({ name: "shortcut-proxy" })'), true);
+  assert.equal(folderJs.includes("async function invokeToolbarShortcut"), true);
+  assert.equal(folderJs.includes("runtime.connect"), false);
+  assert.equal(folderJs.includes("shortcut-proxy"), false);
   assert.equal(folderHtml.includes('src="popup-shortcuts.js"'), false);
+});
+
+test("loads the shared platform adapter before the folder module", () => {
+  const platformIndex = folderHtml.indexOf('src="platform.js"');
+  const folderIndex = folderHtml.indexOf('src="folder.js"');
+  assert.ok(platformIndex >= 0);
+  assert.ok(folderIndex > platformIndex);
+});
+
+test("shows root toolbar position and supports Chrome favicon rendering", () => {
+  assert.equal(folderHtml.includes('id="root-position"'), true);
+  assert.equal(folderCss.includes(".root-position"), true);
+  assert.equal(folderCss.includes(".item-icon img"), true);
+  assert.equal(folderJs.includes("platform.getFaviconUrl?.(item.url, 16)"), true);
+});
+
+test("Chrome options expose shortcut diagnostics and bookmark source selection", () => {
+  assert.equal(optionsHtml.includes('id="chrome-settings"'), true);
+  assert.equal(optionsHtml.includes('id="shortcut-summary"'), true);
+  assert.equal(optionsHtml.includes('chrome://extensions/shortcuts'), true);
+  assert.equal(optionsHtml.includes('id="bookmark-source"'), true);
+  assert.equal(optionsJs.includes("extensionApi.commands.getAll()"), true);
+  assert.equal(optionsJs.includes("platform.setBookmarkBarPreference"), true);
 });
 
 test("defines a full-page layout for folder views opened in a tab", () => {

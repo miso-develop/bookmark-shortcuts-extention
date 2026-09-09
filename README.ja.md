@@ -2,80 +2,135 @@
 
 [English](README.md) | **日本語**
 
-Firefox のブックマークツールバーをキーボードから直接操作する、最小権限の WebExtension です。
+Firefox / Chrome のブックマークツールバー / ブックマークバーをキーボードから直接操作する、最小権限の拡張機能です。
+
+## 対応ブラウザ
+
+- Firefox: Manifest V3
+- Chrome 134 以降: Manifest V3
+
+フォルダUIは両ブラウザとも拡張機能のAction Popupを使用します。Side Panelは使用しません。
 
 ## 基本ショートカット
 
 | ショートカット | 動作 |
 | --- | --- |
-| `Alt+1` ～ `Alt+9` | ブックマークツールバー左から 1 ～ 9 番目を開く |
+| `Alt+1` ～ `Alt+9` | ブックマークツールバー / バー左から 1 ～ 9 番目を開く |
 | `Alt+0` | 10 番目を開く |
-| `Alt+Shift+1` ～ `Alt+Shift+0` | 通常ブックマークなら新しいタブで開く |
+| `Alt+Shift+1` ～ `Alt+Shift+0` | 通常ブックマークを新しいタブで開く |
 
-対象がフォルダの場合は専用ポップアップを開きます。フォルダや区切りもブックマークツールバー上の位置として数えます。
+フォルダも位置として数えます。Firefoxでは区切りも位置として数えます。
+
+### Chromeのショートカット初期設定
+
+Chromeでは、拡張機能が既定値として割り当てられるショートカットは最大4件です。そのためChrome版では初期状態で次の4件だけを提案します。
+
+- `Alt+1`
+- `Alt+2`
+- `Alt+3`
+- `Alt+4`
+
+コマンド自体は20件すべて登録します。残りは一度だけ以下から設定してください。
+
+```text
+chrome://extensions/shortcuts
+```
+
+拡張機能のOptions画面では、現在の設定状況を `configured / 20` 形式で表示し、未割当のコマンドを確認できます。
 
 ## フォルダポップアップ
 
-- `↑` / `↓`: 1 項目ずつ選択
-- `Shift+↑` / `Shift+↓`: 5 項目ずつ選択を移動。端では先頭 / 末尾で停止
-- `PageUp` / `PageDown`: 約 1 画面分選択を移動
+ショートカット対象がフォルダの場合、専用ポップアップを開きます。
+
+- `↑` / `↓`: 1項目ずつ選択
+- `Shift+↑` / `Shift+↓`: 5項目ずつ移動。端では先頭 / 末尾で停止
+- `PageUp` / `PageDown`: 約1画面分選択を移動
 - `Shift+PageUp` / `Shift+PageDown`: 通常ページ移動の約半分だけ選択を移動
 - `Home`: 先頭の選択可能項目へ移動
 - `End`: 最後の選択可能項目へ移動
 - `Enter`: 選択中のブックマークを開く / フォルダへ入る
-- `Ctrl+Enter`: ブックマークを新しいタブで開く
-- ルートフォルダで `←` / `→`: ブックマークツールバー上の前 / 次のフォルダへポップアップ内容を切り替える。通常ブックマークや区切りは飛ばし、端では循環しない
+- `Ctrl+Enter`: 選択中のブックマークを新しいタブで開く
+- ルートフォルダで `←` / `→`: ブックマークツールバー / バー上の前 / 次のフォルダへ切り替える。通常ブックマークや区切りは飛ばし、端では循環しない
 - サブフォルダで `←` / `→`: 何もしない
 - `Backspace`: 親フォルダへ戻る
 - 戻るボタン: 親フォルダへ戻る
 - `Alt+Enter`: 現在のフォルダ内容を新しいタブの全画面レイアウトで開く
-- `Alt+Tab`: ポップアップがキーイベントを受け取れた場合は同じ全画面タブ表示を実行します。ただし Windows では Alt+Tab は OS のウィンドウ切替が優先されるため、通常は拡張側で取得できません。
+- `Alt+Tab`: ポップアップがキーイベントを受け取れた場合は同じ全画面表示を実行。ただし通常はOS側のAlt+Tabが優先されるため、拡張側では取得できない
 
-`PageUp` / `PageDown` / `Shift+PageUp` / `Shift+PageDown` / `Shift+↑` / `Shift+↓` / `Home` / `End` は、スクロールだけでなく移動先へ実フォーカスも移します。
+ルートフォルダまたはそのサブフォルダを表示している間、ヘッダには `F3` のようにブックマークバー上の起点位置を表示します。
 
-サブフォルダへ入ってから `Backspace` / 戻るボタンで親へ戻った場合は、親フォルダ内の「今戻ってきたサブフォルダ」項目へ選択状態と実フォーカスを復元します。
+`PageUp` / `PageDown` / `Shift+PageUp` / `Shift+PageDown` / `Shift+↑` / `Shift+↓` / `Home` / `End` は、選択状態だけでなく移動先へ実フォーカスも移します。
+
+サブフォルダから `Backspace` / 戻るボタンで親へ戻った場合は、親フォルダ内の「今戻ってきたサブフォルダ」項目へ選択状態と実フォーカスを復元します。
 
 ### マウスとキーボードのフォーカス優先順位
 
-マウスを実際に動かして項目上を移動したときは、その項目へ選択とフォーカスを同期します。その後にキーボード入力があった場合はキーボード選択を優先します。マウスカーソルが以前の項目上に静止していても、キー入力後に古い hover 表示が選択を奪い返さないようにしています。
+マウスを実際に動かして項目上を移動したときは、その項目へ選択とフォーカスを同期します。その後にキー入力があった場合はキーボード選択を優先します。マウスカーソルが以前の項目上に静止していても、キー入力後に古いhover表示が選択を奪い返しません。
 
 `Tab` / `Shift+Tab` によるポップアップ内フォーカス移動も維持します。
 
-### ポップアップを開いたまま別のショートカットを押した場合
+### ポップアップを開いたままショートカットを押した場合
 
-フォルダポップアップと background script は `runtime.Port` で接続されています。
+ポップアップ自身が `Alt+数字` を処理し、backgroundの永続状態には依存しません。
 
-- 同じブックマークツールバー上のルートフォルダのショートカット: サブフォルダ表示中でも何もしない
-- 別のフォルダのショートカット: 新しいタブを開かず、現在のポップアップ内容を切り替える
-- ルートフォルダ表示中の `←` / `→`: 前後に存在するフォルダへ同じポップアップ内で切り替える
+- 現在表示しているルートフォルダのショートカット: サブフォルダ表示中でも何もしない
+- 別のフォルダのショートカット: 現在のポップアップ内容をそのフォルダへ切り替える
+- 通常ブックマークのショートカット: ブックマークを開いてポップアップを閉じる
+- ルート階層で `←` / `→`: 同じポップアップ内で前 / 次のフォルダへ切り替える
 
-ポップアップを開けない環境では、同じフォルダビューを全画面レイアウトの新しいタブで開きます。
+この構成により、Chrome Manifest V3のService Workerが停止してglobal変数が失われても、開いているポップアップの操作状態に依存しません。
 
 ### ブラウザーショートカットの抑止
 
-専用ポップアップがキーイベントを受信できた場合、`Esc` と通常の `Tab` / `Shift+Tab` 以外は capture phase で `preventDefault()` / `stopImmediatePropagation()` し、Firefox 側の操作へ伝播しないようにしています。`Ctrl+Tab` もイベントがポップアップへ届けば抑止します。
+専用ポップアップがキーイベントを受信できた場合、`Esc` と通常の `Tab` / `Shift+Tab` 以外はcapture phaseで `preventDefault()` / `stopImmediatePropagation()` します。
 
-ただし Firefox 自身が予約しているショートカットは WebExtension より先にブラウザー UI 側で処理される場合があります。特に `Ctrl+Tab` のようなブラウザー予約キーは DOM `keydown` 自体がポップアップへ届かない場合があり、その場合は WebExtension から完全には無効化できません。この制約は Firefox / WebExtensions の仕様によるものです。
+ただしブラウザまたはOS予約のショートカットは、WebExtensionより先に処理される場合があります。`Ctrl+Tab` や `Alt+Tab` をブラウザ / OS側が先に消費した場合、完全な抑止は保証できません。
 
-`Esc` はポップアップを閉じるため Firefox 側へそのまま渡します。
+`Esc` はポップアップを閉じられるようブラウザ側へそのまま渡します。
+
+## Chrome固有の動作
+
+### Bookmarks Barの選択
+
+Chrome 134以降では、Google Account側とローカルの「This device」側など、複数の `bookmarks-bar` が存在する場合があります。
+
+- 1本だけなら自動選択
+- 複数ある場合はOptions画面から、`Alt+数字` の対象にするBookmarks Barを選択可能
+- 未選択時は、同期中 / Google Account側が存在すればそちらを優先
+
+選択値はIndexedDBへローカル保存します。`storage`権限は追加しません。
+
+### favicon
+
+Chrome版では `favicon` 権限を必須とし、通常ブックマークにはChrome内部に保存されたサイトfaviconを表示します。外部faviconサービスへブックマークURLを送信しません。
+
+フォルダは引き続き汎用フォルダアイコンを使用します。
+
+### Actionアイコン
+
+Chromeでは拡張機能のActionをBookmarks Bar内へ配置できないため、Chrome上部の拡張機能ツールバーに表示されます。
+
+一時的な位置バッジ（`1`、`F3`など）を確認しやすくするためPinを推奨しますが、Pinしていなくてもキーボードショートカット自体は利用できます。
 
 ## 設定
 
-設定はフォルダポップアップには表示しません。Firefox のアドオン管理画面からこの拡張の設定を開いて変更します。
+ブラウザの拡張機能管理画面からOptionsを開きます。
 
-現在の設定:
+共通設定:
 
 - **Enterで常に新しいタブで開く**
 
-設定値は拡張自身の `localStorage` に保存するため、`storage` 権限は要求しません。
+Chrome版ではさらに以下を表示します。
 
-## アイコン
+- キーボードショートカットの設定状況
+- Bookmarks Barが複数ある場合の対象選択
+- ブラウザ / 拡張機能バージョン
 
-Firefox の Bookmarks API は保存済みブックマークの favicon を返しません。外部 favicon サービスへブックマーク URL を送信する実装はプライバシー上採用していないため、現在はフォルダ / ブックマークの汎用アイコンを表示します。
+Enter設定は拡張ページ自身の `localStorage` に保存するため、`storage` 権限は要求しません。
 
 ## 権限
 
-要求する権限は `bookmarks` のみです。
+### Firefox
 
 ```json
 "permissions": [
@@ -83,7 +138,16 @@ Firefox の Bookmarks API は保存済みブックマークの favicon を返し
 ]
 ```
 
-以下は要求しません。
+### Chrome
+
+```json
+"permissions": [
+  "bookmarks",
+  "favicon"
+]
+```
+
+どちらも以下は要求しません。
 
 - `tabs`
 - `storage`
@@ -93,38 +157,69 @@ Firefox の Bookmarks API は保存済みブックマークの favicon を返し
 
 Content Script、外部通信、データ収集もありません。
 
-## 一時インストール
+## ビルド
 
-1. リポジトリを clone または ZIP で取得
-2. Firefox で `about:debugging#/runtime/this-firefox` を開く
+Node.js 22以上:
+
+```bash
+npm run build
+```
+
+出力先:
+
+```text
+dist/firefox/
+dist/chrome/
+```
+
+個別ビルドもできます。
+
+```bash
+npm run build:firefox
+npm run build:chrome
+```
+
+ソースmanifest:
+
+- `manifest.json`: Firefox
+- `manifest.chrome.json`: Chrome
+
+## インストール
+
+### Firefox 開発 / 一時インストール
+
+1. `npm run build:firefox`
+2. Firefoxで `about:debugging#/runtime/this-firefox` を開く
 3. **一時的なアドオンを読み込む**
-4. `manifest.json` を選択
+4. `dist/firefox/manifest.json` を選択
 
-変更後は同じ画面から **再読み込み** してください。
+通常版Firefoxへの常設にはMozilla署名が必要です。個人利用ならAMO Unlistedで署名済みXPIを取得できます。
 
-## ショートカット変更
+### Chrome ローカル常設
 
-`about:addons` → 歯車メニュー → **拡張機能のショートカットキーの管理** から変更できます。
+1. `npm run build:chrome`
+2. `chrome://extensions` を開く
+3. **Developer mode** をON
+4. **Load unpacked** を選択
+5. `dist/chrome` ディレクトリを指定
+6. `chrome://extensions/shortcuts` で必要な残りのショートカットを設定
+7. 必要に応じてBookmark ShortcutsをChromeの拡張機能ツールバーへPin
+
+unpacked拡張はChrome再起動後も残ります。再ビルド後は `chrome://extensions` から **Reload** してください。
 
 ## テスト
-
-Node.js 22 以上:
 
 ```bash
 npm test
 ```
 
-GitHub Actions でも `main` への push と Pull Request ごとに同じテストを実行します。
-
-## 常用する場合
-
-通常版 Firefox へ永続インストールするには Mozilla の署名が必要です。公開せずに使う場合は AMO の Unlisted 配布として署名済み XPI を取得できます。
+GitHub Actionsでは `main` へのpushとPull Requestごとにテストを実行し、Firefox / Chrome両方のパッケージをビルドします。
 
 ## 参考
 
 - https://github.com/mortalis13/Bookmark-Shortcuts
 
-既存プロジェクトのコードをコピーせず、必要な WebExtensions API のみで再実装しています。
+既存プロジェクトのコードをコピーせず、必要なブラウザ拡張APIのみで再実装しています。
 
 ## License
 
