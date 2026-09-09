@@ -65,14 +65,17 @@ body.full-page {
 }
 
 .up,
+.settings,
 .item {
   font: inherit;
   color: inherit;
 }
 
-.up {
+.up,
+.settings {
   width: 30px;
   height: 30px;
+  flex: 0 0 30px;
   border: 0;
   border-radius: 6px;
   background: transparent;
@@ -80,9 +83,22 @@ body.full-page {
   font-size: 18px;
 }
 
+.settings {
+  display: grid;
+  place-items: center;
+  padding: 0;
+}
+
 .up:hover,
+.settings:hover,
 .item:hover {
   background: color-mix(in srgb, CanvasText 10%, transparent);
+}
+
+.up:focus-visible,
+.settings:focus-visible {
+  outline: 2px solid color-mix(in srgb, CanvasText 50%, transparent);
+  outline-offset: -2px;
 }
 
 body.keyboard-navigation .item:hover:not(.keyboard-selected) {

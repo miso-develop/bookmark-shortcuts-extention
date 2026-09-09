@@ -11,6 +11,7 @@ const commonEntries = [
   "folder.html",
   "folder.js",
   "folder.css",
+  "settings-button.js",
   "popup-shortcuts.js",
   "options.html",
   "options.js",

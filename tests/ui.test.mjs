@@ -8,6 +8,7 @@ const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const folderHtml = readFileSync(resolve(root, "folder.html"), "utf8");
 const folderCss = readFileSync(resolve(root, "folder.css"), "utf8");
 const folderJs = readFileSync(resolve(root, "folder.js"), "utf8");
+const settingsButtonJs = readFileSync(resolve(root, "settings-button.js"), "utf8");
 const optionsHtml = readFileSync(resolve(root, "options.html"), "utf8");
 const optionsJs = readFileSync(resolve(root, "options.js"), "utf8");
 
@@ -61,6 +62,20 @@ test("loads the shared platform adapter before the folder module", () => {
   const folderIndex = folderHtml.indexOf('src="folder.js"');
   assert.ok(platformIndex >= 0);
   assert.ok(folderIndex > platformIndex);
+});
+
+test("opens extension settings from a gear button in the popup header", () => {
+  assert.equal(folderHtml.includes('id="settings"'), true);
+  assert.equal(folderHtml.includes('class="settings"'), true);
+  assert.equal(folderHtml.includes('src="settings-button.js"'), true);
+  assert.equal(folderCss.includes(".settings"), true);
+  assert.equal(settingsButtonJs.includes("runtime.openOptionsPage()"), true);
+  assert.equal(settingsButtonJs.includes('event.key !== "Enter" && event.key !== " "'), true);
+
+  const settingsIndex = folderHtml.indexOf('src="settings-button.js"');
+  const folderIndex = folderHtml.indexOf('src="folder.js"');
+  assert.ok(settingsIndex >= 0);
+  assert.ok(folderIndex > settingsIndex);
 });
 
 test("shows root toolbar position and supports Chrome favicon rendering", () => {
