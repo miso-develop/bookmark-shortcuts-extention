@@ -99,6 +99,10 @@ body.full-page {
   padding: 0;
 }
 
+.settings[hidden] {
+  display: none;
+}
+
 .settings-icon {
   width: 20px;
   height: 20px;
