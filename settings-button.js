@@ -27,6 +27,29 @@
     return document.body.classList.contains("settings-view-active");
   }
 
+  function shouldRedirectFirefoxReverseTab(event) {
+    if (platform?.isChrome || settingsActive()) return false;
+    if (
+      event.key !== "Tab" || !event.shiftKey ||
+      event.ctrlKey || event.altKey || event.metaKey ||
+      settingsButton.hidden
+    ) {
+      return false;
+    }
+
+    const firstSelectable = document.querySelector("#items .item:not(:disabled)");
+    const active = document.activeElement;
+    const activeSeparator =
+      active instanceof Element && active.matches("#items hr");
+
+    return (
+      active === firstSelectable ||
+      active === document.body ||
+      active === document.documentElement ||
+      activeSeparator
+    );
+  }
+
   function showSettings() {
     if (settingsActive()) return;
 
@@ -82,6 +105,13 @@
   settingsBackButton.addEventListener("click", hideSettings);
 
   window.addEventListener("keydown", (event) => {
+    if (shouldRedirectFirefoxReverseTab(event)) {
+      event.preventDefault();
+      event.stopImmediatePropagation();
+      settingsButton.focus({ preventScroll: true });
+      return;
+    }
+
     if (settingsActive()) {
       if (event.key === "Escape") {
         event.preventDefault();
@@ -116,6 +146,12 @@
       showSettings();
     }
   }, true);
+
+  document.addEventListener("focusin", (event) => {
+    if (platform?.isChrome || settingsActive() || settingsButton.hidden) return;
+    if (!(event.target instanceof Element) || !event.target.matches("#items hr")) return;
+    settingsButton.focus({ preventScroll: true });
+  });
 
   window.addEventListener("message", (event) => {
     if (!settingsActive()) return;
