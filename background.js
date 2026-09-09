@@ -29,17 +29,53 @@ if (!extensionApi || !platform) {
   throw new Error("Bookmark Shortcuts platform initialization failed.");
 }
 
-if (platform.isChrome && extensionApi.runtime?.onMessage?.addListener) {
+if (extensionApi.runtime?.onMessage?.addListener) {
   extensionApi.runtime.onMessage.addListener((message) => {
-    if (message?.type !== "open-chrome-shortcuts") return undefined;
+    if (message?.type === "open-options-page") {
+      return openExtensionOptionsPage();
+    }
 
-    return extensionApi.tabs.create({ url: "chrome://extensions/shortcuts" })
-      .then(() => ({ ok: true }))
-      .catch((error) => {
-        console.error("Failed to open Chrome shortcut settings:", error);
-        return { ok: false, error: String(error) };
-      });
+    if (platform.isChrome && message?.type === "open-chrome-shortcuts") {
+      return extensionApi.tabs.create({ url: "chrome://extensions/shortcuts" })
+        .then(() => ({ ok: true }))
+        .catch((error) => {
+          console.error("Failed to open Chrome shortcut settings:", error);
+          return { ok: false, error: String(error) };
+        });
+    }
+
+    return undefined;
   });
+}
+
+async function openExtensionOptionsPage() {
+  let primaryError = null;
+
+  if (typeof extensionApi.runtime?.openOptionsPage === "function") {
+    try {
+      await extensionApi.runtime.openOptionsPage();
+      return { ok: true };
+    } catch (error) {
+      primaryError = error;
+    }
+  }
+
+  try {
+    await extensionApi.tabs.create({
+      url: extensionApi.runtime.getURL("options.html")
+    });
+    return { ok: true, fallback: true };
+  } catch (fallbackError) {
+    console.error(
+      "Failed to open extension settings:",
+      primaryError ?? fallbackError,
+      fallbackError
+    );
+    return {
+      ok: false,
+      error: String(primaryError ?? fallbackError)
+    };
+  }
 }
 
 extensionApi.commands.onCommand.addListener(async (command) => {

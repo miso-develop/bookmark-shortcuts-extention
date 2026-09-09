@@ -65,12 +65,15 @@ test("loads the shared platform adapter before the folder module", () => {
   assert.ok(folderIndex > platformIndex);
 });
 
-test("opens extension settings from a gear button in the popup header", () => {
+test("opens extension settings from an SVG gear button through the background", () => {
   assert.equal(folderHtml.includes('id="settings"'), true);
-  assert.equal(folderHtml.includes('class="settings"'), true);
+  assert.equal(folderHtml.includes('class="settings-icon"'), true);
+  assert.equal(folderHtml.includes('<svg class="settings-icon"'), true);
+  assert.equal(folderHtml.includes('>⚙</button>'), false);
   assert.equal(folderHtml.includes('src="settings-button.js"'), true);
-  assert.equal(folderCss.includes(".settings"), true);
-  assert.equal(settingsButtonJs.includes("runtime.openOptionsPage()"), true);
+  assert.equal(folderCss.includes(".settings-icon"), true);
+  assert.equal(settingsButtonJs.includes('type: "open-options-page"'), true);
+  assert.equal(settingsButtonJs.includes("runtime.openOptionsPage()"), false);
   assert.equal(settingsButtonJs.includes('event.key !== "Enter" && event.key !== " "'), true);
 
   const settingsIndex = folderHtml.indexOf('src="settings-button.js"');
@@ -79,11 +82,17 @@ test("opens extension settings from a gear button in the popup header", () => {
   assert.ok(folderIndex > settingsIndex);
 });
 
-test("uses a larger Chrome popup font while keeping rows compact in both browsers", () => {
+test("uses a moderately larger Chrome font and denser popup rows", () => {
   assert.equal(settingsButtonJs.includes('classList.toggle("browser-chrome"'), true);
-  assert.equal(folderCss.includes("body.browser-chrome {\n  font-size: 15px;"), true);
-  assert.equal(folderCss.includes("padding: 5px 8px;"), true);
-  assert.equal(folderCss.includes("line-height: 1.15;"), true);
+  assert.equal(folderCss.includes("body.browser-chrome {\n  font-size: 14px;"), true);
+  assert.equal(folderCss.includes("padding: 3px 8px;"), true);
+  assert.equal(folderCss.includes("line-height: 1.05;"), true);
+  assert.equal(folderCss.includes("width: 21px;\n  height: 21px;"), true);
+});
+
+test("matches the Chrome options-page font size to the popup", () => {
+  assert.equal(optionsJs.includes('classList.toggle("browser-chrome"'), true);
+  assert.equal(optionsCss.includes("body.browser-chrome {\n  font-size: 14px;"), true);
 });
 
 test("shows root toolbar position and supports Chrome favicon rendering", () => {

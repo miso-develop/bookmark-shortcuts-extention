@@ -4,6 +4,8 @@ const COMMAND_PATTERN = /^open-bookmark(-new)?-(10|[1-9])$/;
 const platform = globalThis.BookmarkShortcutsPlatform;
 const extensionApi = platform?.api;
 
+document.body.classList.toggle("browser-chrome", Boolean(platform?.isChrome));
+
 const checkbox = document.getElementById("always-new-tab");
 const status = document.getElementById("status");
 const chromeSettings = document.getElementById("chrome-settings");

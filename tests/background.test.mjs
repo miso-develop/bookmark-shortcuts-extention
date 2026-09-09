@@ -19,6 +19,7 @@ function createHarness({
   activeTab = { id: 17, pinned: false },
   bookmarksError = null,
   openPopupError = null,
+  openOptionsPageError = null,
   chromeBars = null
 } = {}) {
   let commandListener;
@@ -33,6 +34,7 @@ function createHarness({
     setTitle: [],
     setPopup: [],
     openPopup: 0,
+    openOptionsPage: 0,
     getURL: [],
     timers: [],
     errors: []
@@ -79,6 +81,10 @@ function createHarness({
 
   const runtime = {
     onMessage: { addListener(fn) { messageListener = fn; } },
+    async openOptionsPage() {
+      calls.openOptionsPage += 1;
+      if (openOptionsPageError) throw openOptionsPageError;
+    },
     getURL(path) {
       calls.getURL.push(path);
       return `${kind === "chrome" ? "chrome" : "moz"}-extension://test/${path}`;
@@ -139,6 +145,29 @@ test("opens a Firefox bookmarks-toolbar bookmark in the active tab", async () =>
   assert.deepEqual(harness.calls.getChildren, ["toolbar_____"]);
   assert.deepEqual(harness.calls.update, [[17, { url: "https://example.com/1" }]]);
   assert.deepEqual(harness.calls.setBadgeText, [{ text: "1" }]);
+});
+
+test("opens extension options from a Firefox popup message", async () => {
+  const harness = createHarness();
+  const response = await harness.sendMessage({ type: "open-options-page" });
+
+  assert.deepEqual(plain(response), { ok: true });
+  assert.equal(harness.calls.openOptionsPage, 1);
+  assert.deepEqual(harness.calls.create, []);
+});
+
+test("falls back to a normal tab if Firefox cannot open its integrated options page", async () => {
+  const harness = createHarness({
+    openOptionsPageError: new Error("options manager unavailable")
+  });
+  const response = await harness.sendMessage({ type: "open-options-page" });
+
+  assert.deepEqual(plain(response), { ok: true, fallback: true });
+  assert.equal(harness.calls.openOptionsPage, 1);
+  assert.deepEqual(harness.calls.getURL, ["options.html"]);
+  assert.deepEqual(harness.calls.create, [
+    { url: "moz-extension://test/options.html" }
+  ]);
 });
 
 test("selects the syncing Chrome bookmarks bar by default when multiple bars exist", async () => {

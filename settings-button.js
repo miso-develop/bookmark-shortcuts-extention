@@ -5,7 +5,7 @@
 
   document.body.classList.toggle("browser-chrome", Boolean(platform?.isChrome));
 
-  if (!settingsButton || !extensionApi?.runtime?.openOptionsPage) return;
+  if (!settingsButton || !extensionApi?.runtime?.sendMessage) return;
 
   let opening = false;
 
@@ -14,7 +14,12 @@
     opening = true;
 
     try {
-      await extensionApi.runtime.openOptionsPage();
+      const response = await extensionApi.runtime.sendMessage({
+        type: "open-options-page"
+      });
+      if (response?.ok === false) {
+        throw new Error(response.error || "Failed to open extension settings.");
+      }
       window.close();
     } catch (error) {
       opening = false;
