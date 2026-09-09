@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Bookmark Shortcuts Minimal",
-  "version": "2.0.4",
+  "version": "2.0.5",
   "minimum_chrome_version": "134",
   "description": "Open bookmarks bar items and folders with Alt+1 through Alt+0.",
   "permissions": [

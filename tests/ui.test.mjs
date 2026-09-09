@@ -13,7 +13,7 @@ const optionsHtml = readFileSync(resolve(root, "options.html"), "utf8");
 const optionsJs = readFileSync(resolve(root, "options.js"), "utf8");
 const optionsCss = readFileSync(resolve(root, "options.css"), "utf8");
 
-test("keeps settings out of the folder popup and in the options page", () => {
+test("keeps settings controls in the shared options page", () => {
   assert.equal(folderHtml.includes('id="always-new-tab"'), false);
   assert.equal(optionsHtml.includes('id="always-new-tab"'), true);
 });
@@ -65,28 +65,38 @@ test("loads the shared platform adapter before the folder module", () => {
   assert.ok(folderIndex > platformIndex);
 });
 
-test("opens Firefox settings in a popup window and Chrome settings through the background", () => {
+test("switches the action popup to the shared options page instead of opening another window", () => {
   assert.equal(folderHtml.includes('id="settings"'), true);
+  assert.equal(folderHtml.includes('id="settings-back"'), true);
+  assert.equal(folderHtml.includes('id="folder-view"'), true);
+  assert.equal(folderHtml.includes('id="settings-view"'), true);
+  assert.equal(folderHtml.includes('id="settings-frame"'), true);
   assert.equal(folderHtml.includes('class="settings-icon"'), true);
   assert.equal(folderHtml.includes('<svg class="settings-icon"'), true);
   assert.equal(folderHtml.includes('>⚙</button>'), false);
-  assert.equal(folderHtml.includes('src="settings-button.js"'), true);
-  assert.equal(folderCss.includes(".settings-icon"), true);
-  assert.equal(settingsButtonJs.includes("platform?.isChrome"), true);
-  assert.equal(settingsButtonJs.includes('type: "open-options-page"'), true);
-  assert.equal(settingsButtonJs.includes('runtime.getURL("options.html")'), true);
-  assert.equal(settingsButtonJs.includes("extensionApi.windows.create({"), true);
-  assert.equal(settingsButtonJs.includes('type: "popup"'), true);
-  assert.equal(settingsButtonJs.includes("width: 640"), true);
-  assert.equal(settingsButtonJs.includes("height: 560"), true);
-  assert.equal(settingsButtonJs.includes("extensionApi.tabs.create({ url: optionsUrl })"), true);
-  assert.equal(settingsButtonJs.includes("runtime.openOptionsPage()"), false);
-  assert.equal(settingsButtonJs.includes('event.key !== "Enter" && event.key !== " "'), true);
+  assert.equal(folderCss.includes(".settings-view"), true);
+  assert.equal(folderCss.includes(".settings-frame"), true);
+  assert.equal(settingsButtonJs.includes('runtime.getURL("options.html?embedded=1")'), true);
+  assert.equal(settingsButtonJs.includes('classList.add("settings-view-active")'), true);
+  assert.equal(settingsButtonJs.includes('classList.remove("settings-view-active")'), true);
+  assert.equal(settingsButtonJs.includes("extensionApi.windows.create"), false);
+  assert.equal(settingsButtonJs.includes("extensionApi.tabs.create"), false);
+  assert.equal(settingsButtonJs.includes('type: "open-options-page"'), false);
+  assert.equal(settingsButtonJs.includes('event.data?.type !== "close-popup-settings"'), true);
 
   const settingsIndex = folderHtml.indexOf('src="settings-button.js"');
   const folderIndex = folderHtml.indexOf('src="folder.js"');
   assert.ok(settingsIndex >= 0);
   assert.ok(folderIndex > settingsIndex);
+});
+
+test("renders the shared options page compactly when embedded in the popup", () => {
+  assert.equal(optionsJs.includes('get("embedded") === "1"'), true);
+  assert.equal(optionsJs.includes('classList.toggle("embedded-options", embeddedOptions)'), true);
+  assert.equal(optionsJs.includes('type: "close-popup-settings"'), true);
+  assert.equal(optionsCss.includes("body.embedded-options"), true);
+  assert.equal(optionsCss.includes(".embedded-options main"), true);
+  assert.equal(optionsCss.includes(".embedded-options h1"), true);
 });
 
 test("uses a 12px Chrome popup font with dense rows", () => {

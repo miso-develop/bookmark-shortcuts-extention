@@ -10,6 +10,7 @@
   <body>
     <header class="header">
       <button id="up" class="up" type="button" aria-label="親フォルダへ" hidden>←</button>
+      <button id="settings-back" class="settings-back" type="button" aria-label="ブックマーク一覧へ戻る" title="戻る" hidden>←</button>
       <div id="root-position" class="root-position" hidden></div>
       <div class="heading">
         <div id="folder-title" class="folder-title">Bookmark Shortcuts</div>
@@ -23,8 +24,13 @@
     </header>
 
     <main>
-      <div id="message" class="message">ショートカットでフォルダを選択すると、ここに内容を表示します。</div>
-      <div id="items" class="items" hidden></div>
+      <div id="folder-view">
+        <div id="message" class="message">ショートカットでフォルダを選択すると、ここに内容を表示します。</div>
+        <div id="items" class="items" hidden></div>
+      </div>
+      <section id="settings-view" class="settings-view" hidden>
+        <iframe id="settings-frame" class="settings-frame" title="Bookmark Shortcuts 設定"></iframe>
+      </section>
     </main>
 
     <script src="platform.js"></script>

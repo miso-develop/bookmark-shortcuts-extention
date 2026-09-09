@@ -3,8 +3,10 @@ const COMMAND_PATTERN = /^open-bookmark(-new)?-(10|[1-9])$/;
 
 const platform = globalThis.BookmarkShortcutsPlatform;
 const extensionApi = platform?.api;
+const embeddedOptions = new URLSearchParams(window.location.search).get("embedded") === "1";
 
 document.body.classList.toggle("browser-chrome", Boolean(platform?.isChrome));
+document.body.classList.toggle("embedded-options", embeddedOptions);
 
 const checkbox = document.getElementById("always-new-tab");
 const status = document.getElementById("status");
@@ -28,6 +30,14 @@ checkbox.addEventListener("change", () => {
   localStorage.setItem(ALWAYS_NEW_TAB_KEY, String(checkbox.checked));
   showStatus("設定を保存しました。");
 });
+
+if (embeddedOptions) {
+  window.addEventListener("keydown", (event) => {
+    if (event.key !== "Escape") return;
+    event.preventDefault();
+    window.parent.postMessage({ type: "close-popup-settings" }, "*");
+  });
+}
 
 function commandLabel(name) {
   const match = COMMAND_PATTERN.exec(name ?? "");
