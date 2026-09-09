@@ -14,7 +14,7 @@ body {
 }
 
 body.browser-chrome {
-  font-size: 14px;
+  font-size: 12px;
 }
 
 body.full-page {
@@ -103,8 +103,8 @@ body.full-page {
 }
 
 body.browser-chrome .settings-icon {
-  width: 21px;
-  height: 21px;
+  width: 20px;
+  height: 20px;
 }
 
 .up:hover,

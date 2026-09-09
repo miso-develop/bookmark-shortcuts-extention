@@ -5,7 +5,7 @@
 
   document.body.classList.toggle("browser-chrome", Boolean(platform?.isChrome));
 
-  if (!settingsButton || !extensionApi?.runtime?.sendMessage) return;
+  if (!settingsButton || !extensionApi?.runtime) return;
 
   let opening = false;
 
@@ -14,12 +14,22 @@
     opening = true;
 
     try {
-      const response = await extensionApi.runtime.sendMessage({
-        type: "open-options-page"
-      });
-      if (response?.ok === false) {
-        throw new Error(response.error || "Failed to open extension settings.");
+      if (platform?.isChrome) {
+        const response = await extensionApi.runtime.sendMessage({
+          type: "open-options-page"
+        });
+        if (response?.ok === false) {
+          throw new Error(response.error || "Failed to open extension settings.");
+        }
+      } else {
+        const optionsUrl = extensionApi.runtime.getURL("options.html");
+        if (typeof extensionApi.tabs?.create === "function") {
+          await extensionApi.tabs.create({ url: optionsUrl });
+        } else {
+          window.open(optionsUrl, "_blank", "noopener");
+        }
       }
+
       window.close();
     } catch (error) {
       opening = false;
