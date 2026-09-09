@@ -11,6 +11,12 @@ import {
   pageSelectionIndex,
   shouldOpenInNewTab
 } from "../folder.js";
+import {
+  findTypeaheadMatchIndex,
+  isTypeaheadKeyEvent,
+  normalizeTypeaheadText,
+  TYPEAHEAD_RESET_MS
+} from "../typeahead.js";
 
 test("loads a bookmark folder and its children", async () => {
   const calls = { get: [], getChildren: [] };
@@ -174,4 +180,30 @@ test("builds popup and full-page folder view paths", () => {
     buildFolderViewPath("folder/1", { fullPage: true }),
     "folder.html?id=folder%2F1&view=tab"
   );
+});
+
+test("normalizes type-ahead text across case and full-width characters", () => {
+  assert.equal(normalizeTypeaheadText("GitHub"), "github");
+  assert.equal(normalizeTypeaheadText("ＧｉｔＨｕｂ"), "github");
+  assert.equal(normalizeTypeaheadText("ＡＩ ツール"), "ai ツール");
+});
+
+test("finds type-ahead matches by title prefix and wraps from a start index", () => {
+  const labels = ["Amazon", "GitHub", "Google Drive", "GitLab"];
+  assert.equal(findTypeaheadMatchIndex(labels, "git"), 1);
+  assert.equal(findTypeaheadMatchIndex(labels, "ＧＯＯ"), 2);
+  assert.equal(findTypeaheadMatchIndex(labels, "git", { startIndex: 2 }), 3);
+  assert.equal(findTypeaheadMatchIndex(labels, "git", { startIndex: 4 }), 1);
+  assert.equal(findTypeaheadMatchIndex(labels, "missing"), -1);
+});
+
+test("accepts plain printable keys for type-ahead without stealing command modifiers", () => {
+  assert.equal(isTypeaheadKeyEvent({ key: "g" }), true);
+  assert.equal(isTypeaheadKeyEvent({ key: "Ｇ", shiftKey: true }), true);
+  assert.equal(isTypeaheadKeyEvent({ key: "あ" }), true);
+  assert.equal(isTypeaheadKeyEvent({ key: "g", ctrlKey: true }), false);
+  assert.equal(isTypeaheadKeyEvent({ key: "1", altKey: true }), false);
+  assert.equal(isTypeaheadKeyEvent({ key: "ArrowDown" }), false);
+  assert.equal(isTypeaheadKeyEvent({ key: "Process", isComposing: true }), false);
+  assert.equal(TYPEAHEAD_RESET_MS, 1000);
 });

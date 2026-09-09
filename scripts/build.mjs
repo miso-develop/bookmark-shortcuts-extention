@@ -12,6 +12,7 @@ const commonEntries = [
   "folder.js",
   "folder.css",
   "settings-button.js",
+  "typeahead.js",
   "popup-shortcuts.js",
   "options.html",
   "options.js",
