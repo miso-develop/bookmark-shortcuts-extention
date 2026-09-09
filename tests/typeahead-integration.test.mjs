@@ -22,9 +22,11 @@ test("limits type-ahead to the dedicated folder popup", () => {
   assert.equal(typeaheadJs.includes('event.stopImmediatePropagation()'), true);
 });
 
-test("cycles repeated single-character type-ahead matches", () => {
-  assert.equal(typeaheadJs.includes("const cycleSameInitial = query.length === 1 && query === normalizedKey;"), true);
-  assert.equal(typeaheadJs.includes("currentIndex + 1"), true);
+test("uses the resolver for repeated-character cycling and fresh-key fallback", () => {
+  assert.equal(typeaheadJs.includes("export function resolveTypeaheadInput("), true);
+  assert.equal(typeaheadJs.includes("currentIndex >= 0 ? currentIndex + 1 : 0"), true);
+  assert.equal(typeaheadJs.includes("const combinedQuery = `${normalizedQuery}${normalizedKey}`;"), true);
+  assert.equal(typeaheadJs.includes("query: normalizedKey"), true);
 });
 
 test("includes type-ahead in both Firefox and Chrome builds", () => {
