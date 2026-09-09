@@ -38,6 +38,42 @@ export function findTypeaheadMatchIndex(
   return -1;
 }
 
+export function resolveTypeaheadInput(
+  labels,
+  currentQuery,
+  key,
+  { currentIndex = -1 } = {}
+) {
+  const normalizedKey = normalizeTypeaheadText(key);
+  const normalizedQuery = normalizeTypeaheadText(currentQuery);
+  if (!normalizedKey) {
+    return { query: normalizedQuery, matchIndex: -1 };
+  }
+
+  const cycleSameInitial =
+    normalizedQuery.length === 1 && normalizedQuery === normalizedKey;
+
+  if (cycleSameInitial) {
+    return {
+      query: normalizedKey,
+      matchIndex: findTypeaheadMatchIndex(labels, normalizedKey, {
+        startIndex: currentIndex >= 0 ? currentIndex + 1 : 0
+      })
+    };
+  }
+
+  const combinedQuery = `${normalizedQuery}${normalizedKey}`;
+  const combinedMatchIndex = findTypeaheadMatchIndex(labels, combinedQuery);
+  if (combinedMatchIndex >= 0) {
+    return { query: combinedQuery, matchIndex: combinedMatchIndex };
+  }
+
+  return {
+    query: normalizedKey,
+    matchIndex: findTypeaheadMatchIndex(labels, normalizedKey)
+  };
+}
+
 function initializeFolderTypeahead() {
   let query = "";
   let resetTimer = null;
@@ -102,24 +138,22 @@ function initializeFolderTypeahead() {
       return;
     }
 
-    const cycleSameInitial = query.length === 1 && query === normalizedKey;
-    const nextQuery = cycleSameInitial ? normalizedKey : `${query}${normalizedKey}`;
     const currentIndex = items.indexOf(document.activeElement);
-    const startIndex = cycleSameInitial && currentIndex >= 0 ? currentIndex + 1 : 0;
-    const matchIndex = findTypeaheadMatchIndex(
+    const result = resolveTypeaheadInput(
       items.map(itemLabel),
-      nextQuery,
-      { startIndex }
+      query,
+      normalizedKey,
+      { currentIndex }
     );
 
-    query = nextQuery;
+    query = result.query;
     scheduleReset();
 
     event.preventDefault();
     event.stopImmediatePropagation();
 
-    if (matchIndex >= 0) {
-      focusMatch(items, matchIndex);
+    if (result.matchIndex >= 0) {
+      focusMatch(items, result.matchIndex);
     }
   }, true);
 
